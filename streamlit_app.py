@@ -71,7 +71,7 @@ def load_images(data_folder):
             valid_labels.append(label)
             valid_image_paths.append(image_path)
         except (OSError, IOError) as e:
-            print(f"Skipping corrupted image: {image_path}, error: {e}")
+            st.write(f"Skipping corrupted image: {image_path}, error: {e}")
     
     images = torch.stack(images)
     labels = np.array(valid_labels)
@@ -132,7 +132,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
         if not os.path.exists(model_path):
             os.makedirs(DEFAULT_MODEL_PATH, exist_ok=True)
-        print("Downloading model")
+        st.write("Downloading model")
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     elif model_file is not None:
         model_path = model_file.name
@@ -144,7 +144,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
-        print("Downloading data")
+        st.write("Downloading data")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
@@ -170,7 +170,10 @@ option = st.radio("Choose an option", ["Use Features", "Use Model"])
 if option == "Use Features":
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    data_file = st.file_uploader("Upload Data Folder (optional)")
+    if (data_source=="Upload Data"):
+        data_file = st.file_uploader("Upload Data Folder (optional)")
+    else:
+        data_file = None
     if st.button("Visualize UMAP"):
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
