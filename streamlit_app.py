@@ -15,7 +15,12 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
-    gdown.download(gdrive_url, download_path, quiet=False)
+    try:
+        if not os.path.exists(download_path):
+            gdown.download(gdrive_url, download_path, quiet=False)
+    except Exception as e:
+        st.error(f"Error downloading from Google Drive: {e}")
+        raise
 
 DEFAULT_MODEL_PATH = "models/"
 DEFAULT_DATA_PATH = "data/"
