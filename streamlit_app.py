@@ -1,6 +1,5 @@
 import streamlit as st
 import torch
-import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image, ImageFile
 import os
@@ -8,45 +7,24 @@ import numpy as np
 import umap
 import plotly.express as px
 from tqdm import tqdm
+import gdown
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-embed_sizes = {
-    "dinov2_vits14": 384,
-    "dinov2_vitb14": 768,
-    "dinov2_vitl14": 1024,
-    "dinov2_vitg14": 1536
+# Function to download file from Google Drive
+def download_from_gdrive(gdrive_url, download_path):
+    gdown.download(gdrive_url, download_path, quiet=False)
+
+DEFAULT_MODEL_PATH = "models/"
+DEFAULT_DATA_PATH = "data/"
+GDRIVE_URLS = {
+    "sample_data": st.secrets["GDRIVE_URL_SAMPLE_DATA"],
+    "DinoBloom S": st.secrets["GDRIVE_URL_DINOBLOOM_S"],
+    "DinoBloom B": st.secrets["GDRIVE_URL_DINOBLOOM_B"],
+    "DinoBloom L": st.secrets["GDRIVE_URL_DINOBLOOM_L"],
+    "DinoBloom G": st.secrets["GDRIVE_URL_DINOBLOOM_G"]
 }
-
-model_options = {
-    "DinoBloom S": "dinov2_vits14",
-    "DinoBloom B": "dinov2_vitb14",
-    "DinoBloom L": "dinov2_vitl14",
-    "DinoBloom G": "dinov2_vitg14"
-}
-
-def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    pretrained = torch.load(modelpath, map_location=torch.device('cuda:0'))
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
-    
-    new_state_dict = {}
-    for key, value in pretrained['teacher'].items():
-        if 'dino_head' in key or "ibot_head" in key:
-            pass
-        else:
-            new_key = key.replace('backbone.', '')
-            new_state_dict[new_key] = value
-
-    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
-    model.pos_embed = pos_embed
-
-    model.load_state_dict(new_state_dict, strict=True)
-    model = model.cuda()
-    return model
-
-DEFAULT_MODEL_PATH = "/home/ubuntu/streamlit_app/models/DinoBloom-S.pth"
-DEFAULT_DATA_PATH = "/home/ubuntu/streamlit_app/data/Bodzas/data_sample"
 
 def load_images(data_folder):
     image_paths = []
@@ -110,35 +88,44 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     return fig
 
-def upload_and_process_features(features_file, data_file, data_folder, model_path, model_file, model_option):
+def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
         features = np.load(features_file)
     else:
         raise ValueError("Features file is required for this option.")
     
-    if data_file is not None:
-        data_folder = os.path.dirname(data_file.name)
-    if not data_folder:
-        data_folder = DEFAULT_DATA_PATH
+    if data_source == "Sample Data":
+        data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], data_path)
+    elif data_file is not None:
+        data_path = os.path.dirname(data_file.name)
+    else:
+        raise ValueError("Data source is required for this option.")
 
-    _, labels, class_names, image_paths = load_images(data_folder)
+    _, labels, class_names, image_paths = load_images(data_path)
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-def upload_and_process_data_and_model(features_file, data_file, data_folder, model_path, model_file, model_option):
-    if model_file is not None:
+def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
+    if model_source != "Upload Model":
+        model_key = model_source
+        model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
+        download_from_gdrive(GDRIVE_URLS[model_key], model_path)
+    elif model_file is not None:
         model_path = model_file.name
-    if not model_path:
-        model_path = DEFAULT_MODEL_PATH
+    else:
+        raise ValueError("Model source is required for this option.")
 
-    if data_file is not None:
-        data_folder = os.path.dirname(data_file.name)
-    if not data_folder:
-        data_folder = DEFAULT_DATA_PATH
+    if data_source == "Sample Data":
+        data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], data_path)
+    elif data_file is not None:
+        data_path = os.path.dirname(data_file.name)
+    else:
+        raise ValueError("Data source is required for this option.")
     
-    modelname = model_options[model_option]
-    model = get_dino_bloom(model_path, modelname).cuda()
-    images, labels, class_names, image_paths = load_images(data_folder)
+    model = torch.load(model_path)  # Directly load the model from the path
+    images, labels, class_names, image_paths = load_images(data_path)
     images = images.cuda()
     
     with torch.no_grad():
@@ -148,30 +135,26 @@ def upload_and_process_data_and_model(features_file, data_file, data_folder, mod
     return umap_fig
 
 st.title("UMAP Visualization with DINOv2 Features")
-option = st.radio("Choose an option", ["Upload features and data", "Upload data and model"])
-model_option = st.selectbox("Select Model Type", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G"])
+option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
-if option == "Upload features and data":
+if option == "Use Features":
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
+    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
     data_file = st.file_uploader("Upload Data Folder (optional)")
-    data_folder = st.text_input("Data Folder Path (leave empty if uploading)", DEFAULT_DATA_PATH)
-    model_path = None
-    model_file = None
     if st.button("Visualize UMAP"):
         if features_file is not None:
-            fig = upload_and_process_features(features_file, data_file, data_folder, model_path, model_file, model_option)
+            fig = upload_and_process_features(features_file, data_source, data_file)
             st.plotly_chart(fig)
         else:
             st.error("Please upload a features file.")
 else:
-    features_file = None
-    data_file = st.file_uploader("Upload Data Folder (optional)")
-    data_folder = st.text_input("Data Folder Path (leave empty if uploading)", DEFAULT_DATA_PATH)
+    model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
     model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
-    model_path = st.text_input("Model Path (leave empty if uploading)", DEFAULT_MODEL_PATH)
+    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
+    data_file = st.file_uploader("Upload Data Folder (optional)")
     if st.button("Visualize UMAP"):
-        if model_file is not None or model_path:
-            fig = upload_and_process_data_and_model(features_file, data_file, data_folder, model_path, model_file, model_option)
+        if model_source != "Upload Model" or model_file is not None:
+            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.plotly_chart(fig)
         else:
-            st.error("Please upload a model file or specify the model path.")
+            st.error("Please select a model or upload a model file.")
