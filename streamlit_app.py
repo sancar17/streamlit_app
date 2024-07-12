@@ -10,28 +10,51 @@ from tqdm import tqdm
 import gdown
 import zipfile
 import time
+import requests
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Function to download file from Google Drive
+# Function to download file from Google Drive with retries
 def download_from_gdrive(gdrive_url, download_path):
     try:
         if not os.path.exists(download_path):
-            for _ in range(3):  # Try downloading up to 3 times
+            for attempt in range(5):  # Try downloading up to 5 times
                 try:
+                    st.write(f"Attempt {attempt + 1}: Downloading {gdrive_url} to {download_path}")
                     gdown.download(gdrive_url, download_path, quiet=False, fuzzy=True)
                     if os.path.exists(download_path):
+                        st.write(f"Successfully downloaded to {download_path}")
                         break
                 except Exception as e:
-                    st.error(f"Error downloading from Google Drive: {e}")
+                    st.error(f"Error downloading from Google Drive with gdown: {e}")
                     time.sleep(5)  # Wait for 5 seconds before retrying
+            else:
+                st.write(f"All gdown attempts failed. Trying backup method with requests.")
+                if not download_file_with_requests(gdrive_url, download_path):
+                    st.error("Failed to download the file after multiple attempts.")
+        else:
+            st.write(f"File already exists at {download_path}")
     except Exception as e:
         st.error(f"Error downloading from Google Drive: {e}")
         raise
 
-DEFAULT_MODEL_PATH = "models/"
-DEFAULT_DATA_PATH = "data/"
+# Backup download function using requests
+def download_file_with_requests(url, destination):
+    CHUNK_SIZE = 32768
+    try:
+        response = requests.get(url, stream=True)
+        with open(destination, 'wb') as file:
+            for chunk in response.iter_content(CHUNK_SIZE):
+                file.write(chunk)
+        st.write(f"Successfully downloaded using requests to {destination}")
+        return True
+    except Exception as e:
+        st.error(f"Error downloading with requests: {e}")
+        return False
+
+DEFAULT_MODEL_PATH = "models_download/"
+DEFAULT_DATA_PATH = "data_download/"
 GDRIVE_URLS = {
     "sample_data": st.secrets["GDRIVE_URL_SAMPLE_DATA"],
     "DinoBloom S": st.secrets["GDRIVE_URL_DINOBLOOM_S"],
@@ -170,7 +193,7 @@ option = st.radio("Choose an option", ["Use Features", "Use Model"])
 if option == "Use Features":
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    if (data_source=="Upload Data"):
+    if data_source == "Upload Data":
         data_file = st.file_uploader("Upload Data Folder (optional)")
     else:
         data_file = None
@@ -182,12 +205,12 @@ if option == "Use Features":
             st.error("Please upload a features file.")
 else:
     model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
-    if(model_source=="Upload Model"):
+    if model_source == "Upload Model":
         model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
     else:
         model_file = None
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    if (data_source=="Upload Data"):
+    if data_source == "Upload Data":
         data_file = st.file_uploader("Upload Data Folder (optional)")
     else:
         data_file = None
