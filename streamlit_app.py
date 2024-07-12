@@ -7,7 +7,6 @@ import os
 import numpy as np
 import umap
 import plotly.express as px
-from pathlib import Path
 from tqdm import tqdm
 
 # Enable loading of truncated images
@@ -127,7 +126,7 @@ def upload_and_process_features(features_file, data_file, data_folder, model_pat
 
 def upload_and_process_data_and_model(features_file, data_file, data_folder, model_path, model_file, model_option):
     if model_file is not None:
-        model_path = model_file
+        model_path = model_file.name
     if not model_path:
         model_path = DEFAULT_MODEL_PATH
 
@@ -159,8 +158,7 @@ if option == "Upload features and data":
     model_file = None
     if st.button("Visualize UMAP"):
         if features_file is not None:
-            features = np.load(features_file)
-            fig = upload_and_process_features(features, data_file, data_folder, model_path, model_file, model_option)
+            fig = upload_and_process_features(features_file, data_file, data_folder, model_path, model_file, model_option)
             st.plotly_chart(fig)
         else:
             st.error("Please upload a features file.")
@@ -171,8 +169,8 @@ else:
     model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
     model_path = st.text_input("Model Path (leave empty if uploading)", DEFAULT_MODEL_PATH)
     if st.button("Visualize UMAP"):
-        if model_file is not None:
+        if model_file is not None or model_path:
             fig = upload_and_process_data_and_model(features_file, data_file, data_folder, model_path, model_file, model_option)
             st.plotly_chart(fig)
         else:
-            st.error("Please upload a model file.")
+            st.error("Please upload a model file or specify the model path.")
