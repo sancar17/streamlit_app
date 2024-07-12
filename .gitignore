@@ -1,0 +1,16 @@
+*.png
+*.bmp
+*.pth
+*.pt
+*/__pycache__/
+*/visualizations/
+*.zip
+*.txt
+*checkpoints/
+*/input_images/
+*/models/
+*/tmp/
+tmp/
+models/
+input_images/*
+dino_with*
