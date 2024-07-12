@@ -121,7 +121,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         model_key = model_source
         st.write("Downloading model:", GITHUB_BASE_URL + GITHUB_PATHS[model_key])
         model_bytes = download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS[model_key])
-        model = torch.load("models_final/final_DinoBloom-S.pth")
+        model = torch.load(GITHUB_PATHS[model_key], map_location=torch.device('cpu'))
     elif model_file is not None:
         model_path = model_file.name
         model = torch.load(model_path)
