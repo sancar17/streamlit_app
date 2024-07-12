@@ -132,7 +132,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
         if not os.path.exists(model_path):
             os.makedirs(DEFAULT_MODEL_PATH, exist_ok=True)
-        st.write("Downloading model")
+        st.write("Downloading model:", GDRIVE_URLS[model_key])
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     elif model_file is not None:
         model_path = model_file.name
@@ -144,7 +144,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
-        st.write("Downloading data")
+        st.write("Downloading data:", GDRIVE_URLS["sample_data"])
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
