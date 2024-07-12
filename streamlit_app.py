@@ -8,6 +8,7 @@ import umap
 import plotly.express as px
 from tqdm import tqdm
 import gdown
+import zipfile
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -96,7 +97,13 @@ def upload_and_process_features(features_file, data_source, data_file):
     
     if data_source == "Sample Data":
         data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
-        download_from_gdrive(GDRIVE_URLS["sample_data"], data_path)
+        if not os.path.exists(data_path):
+            os.makedirs(data_path)
+        download_path = os.path.join(data_path, "sample_data.zip")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
+        # Unzip the downloaded file
+        with zipfile.ZipFile(download_path, 'r') as zip_ref:
+            zip_ref.extractall(data_path)
     elif data_file is not None:
         data_path = os.path.dirname(data_file.name)
     else:
@@ -110,6 +117,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     if model_source != "Upload Model":
         model_key = model_source
         model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
+        if not os.path.exists(model_path):
+            os.makedirs(DEFAULT_MODEL_PATH, exist_ok=True)
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     elif model_file is not None:
         model_path = model_file.name
@@ -118,7 +127,13 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
 
     if data_source == "Sample Data":
         data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
-        download_from_gdrive(GDRIVE_URLS["sample_data"], data_path)
+        if not os.path.exists(data_path):
+            os.makedirs(data_path)
+        download_path = os.path.join(data_path, "sample_data.zip")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
+        # Unzip the downloaded file
+        with zipfile.ZipFile(download_path, 'r') as zip_ref:
+            zip_ref.extractall(data_path)
     elif data_file is not None:
         data_path = os.path.dirname(data_file.name)
     else:
