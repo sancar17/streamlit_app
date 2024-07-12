@@ -24,8 +24,6 @@ def download_from_github(github_url, download_path):
                 file.write(chunk)
     st.write(f"Downloaded {github_url} to {download_path}")
 
-DEFAULT_MODEL_PATH = "models_final/"
-DEFAULT_DATA_PATH = "data_download/"
 GITHUB_BASE_URL = "https://github.com/your-username/your-repo/raw/main/"
 GITHUB_PATHS = {
     "sample_data": "models_final/data_sample_small.zip",
@@ -104,7 +102,7 @@ def upload_and_process_features(features_file, data_source, data_file):
         raise ValueError("Features file is required for this option.")
     
     if data_source == "Sample Data":
-        data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
+        data_path = "sample_data"
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
@@ -124,9 +122,7 @@ def upload_and_process_features(features_file, data_source, data_file):
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
-        model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
-        if not os.path.exists(model_path):
-            os.makedirs(DEFAULT_MODEL_PATH, exist_ok=True)
+        model_path = f"{model_key.replace(' ', '_')}.pth"
         st.write("Downloading model:", GITHUB_BASE_URL + GITHUB_PATHS[model_key])
         download_from_github(GITHUB_BASE_URL + GITHUB_PATHS[model_key], model_path)
     elif model_file is not None:
@@ -135,7 +131,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Model source is required for this option.")
 
     if data_source == "Sample Data":
-        data_path = os.path.join(DEFAULT_DATA_PATH, "sample_data")
+        data_path = "sample_data"
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
