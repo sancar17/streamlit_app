@@ -8,21 +8,18 @@ import umap
 import plotly.express as px
 from tqdm import tqdm
 import requests
+from io import BytesIO
 import zipfile
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Function to download file from GitHub
-def download_from_github(github_url, download_path):
-    st.write(f"Downloading {github_url} to {download_path}")
+# Function to download file content from GitHub
+def download_file_content_from_github(github_url):
+    st.write(f"Downloading {github_url}")
     response = requests.get(github_url, stream=True)
     response.raise_for_status()
-    with open(download_path, 'wb') as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                file.write(chunk)
-    st.write(f"Downloaded {github_url} to {download_path}")
+    return BytesIO(response.content)
 
 GITHUB_BASE_URL = "https://github.com/your-username/your-repo/raw/main/"
 GITHUB_PATHS = {
@@ -106,7 +103,7 @@ def upload_and_process_features(features_file, data_source, data_file):
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
-        download_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"], download_path)
+        download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
         # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
@@ -122,11 +119,12 @@ def upload_and_process_features(features_file, data_source, data_file):
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
-        model_path = f"{model_key.replace(' ', '_')}.pth"
         st.write("Downloading model:", GITHUB_BASE_URL + GITHUB_PATHS[model_key])
-        download_from_github(GITHUB_BASE_URL + GITHUB_PATHS[model_key], model_path)
+        model_bytes = download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS[model_key])
+        model = torch.load(model_bytes)
     elif model_file is not None:
         model_path = model_file.name
+        model = torch.load(model_path)
     else:
         raise ValueError("Model source is required for this option.")
 
@@ -136,7 +134,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
         st.write("Downloading data:", GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
-        download_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"], download_path)
+        download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
         # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
@@ -145,7 +143,6 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     else:
         raise ValueError("Data source is required for this option.")
     
-    model = torch.load(model_path)  # Directly load the model from the path
     images, labels, class_names, image_paths = load_images(data_path)
     images = images.cuda()
     
