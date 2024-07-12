@@ -103,28 +103,26 @@ def upload_and_process_features(features_file, data_source, data_file):
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
-        download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
         # Unzip the downloaded file
-        with zipfile.ZipFile(download_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
+        with zipfile.ZipFile(GITHUB_PATHS["sample_data"], 'r') as zip_ref:
+            zip_ref.extractall("./sample_data/")
     elif data_file is not None:
         data_path = os.path.dirname(data_file.name)
     else:
         raise ValueError("Data source is required for this option.")
-
-    _, labels, class_names, image_paths = load_images(data_path)
+    
+    images, labels, class_names, image_paths = load_images("sample_data/")
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
-        st.write("Downloading model:", GITHUB_BASE_URL + GITHUB_PATHS[model_key])
-        model_bytes = download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS[model_key])
+        st.write("Downloading model:", model_key)
         model = torch.load(GITHUB_PATHS[model_key], map_location=torch.device('cpu'))
     elif model_file is not None:
         model_path = model_file.name
-        model = torch.load(model_path)
+        model = torch.load(model_path, map_location=torch.device('cpu'))
     else:
         raise ValueError("Model source is required for this option.")
 
@@ -133,18 +131,15 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
-        st.write("Downloading data:", GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
-        download_file_content_from_github(GITHUB_BASE_URL + GITHUB_PATHS["sample_data"])
         # Unzip the downloaded file
-        with zipfile.ZipFile(download_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
+        with zipfile.ZipFile(GITHUB_PATHS["sample_data"], 'r') as zip_ref:
+            zip_ref.extractall("./sample_data/")
     elif data_file is not None:
         data_path = os.path.dirname(data_file.name)
     else:
         raise ValueError("Data source is required for this option.")
     
-    images, labels, class_names, image_paths = load_images(data_path)
-    images = images.cuda()
+    images, labels, class_names, image_paths = load_images("sample_data/")
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
