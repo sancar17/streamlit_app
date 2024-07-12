@@ -181,9 +181,13 @@ else:
     model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
     if(model_source=="Upload Model"):
         model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
+    else:
+        model_file = None
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
     if (data_source=="Upload Data"):
         data_file = st.file_uploader("Upload Data Folder (optional)")
+    else:
+        data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
