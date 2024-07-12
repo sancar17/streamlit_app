@@ -21,7 +21,7 @@ def download_file_content_from_github(github_url):
     response.raise_for_status()
     return BytesIO(response.content)
 
-GITHUB_BASE_URL = "https://github.com/your-username/your-repo/raw/main/"
+GITHUB_BASE_URL = "https://github.com/sancar17/streamlit_app/main/"
 GITHUB_PATHS = {
     "sample_data": "models_final/data_sample_small.zip",
     "DinoBloom S": "models_final/final_DinoBloom-S.pth",
