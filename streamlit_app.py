@@ -9,6 +9,7 @@ import plotly.express as px
 from tqdm import tqdm
 import gdown
 import zipfile
+import time
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -17,7 +18,14 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 def download_from_gdrive(gdrive_url, download_path):
     try:
         if not os.path.exists(download_path):
-            gdown.download(gdrive_url, download_path, quiet=False)
+            for _ in range(3):  # Try downloading up to 3 times
+                try:
+                    gdown.download(gdrive_url, download_path, quiet=False, fuzzy=True)
+                    if os.path.exists(download_path):
+                        break
+                except Exception as e:
+                    st.error(f"Error downloading from Google Drive: {e}")
+                    time.sleep(5)  # Wait for 5 seconds before retrying
     except Exception as e:
         st.error(f"Error downloading from Google Drive: {e}")
         raise
