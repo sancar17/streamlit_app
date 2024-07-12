@@ -5,7 +5,6 @@
 */__pycache__/
 */visualizations/
 *.zip
-*.txt
 *checkpoints/
 */input_images/
 */models/
