@@ -132,6 +132,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         model_path = os.path.join(DEFAULT_MODEL_PATH, f"{model_key.replace(' ', '_')}.pth")
         if not os.path.exists(model_path):
             os.makedirs(DEFAULT_MODEL_PATH, exist_ok=True)
+        print("Downloading model")
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     elif model_file is not None:
         model_path = model_file.name
@@ -143,6 +144,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         if not os.path.exists(data_path):
             os.makedirs(data_path)
         download_path = os.path.join(data_path, "sample_data.zip")
+        print("Downloading data")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
@@ -177,9 +179,11 @@ if option == "Use Features":
             st.error("Please upload a features file.")
 else:
     model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
-    model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
+    if(model_source=="Upload Model"):
+        model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    data_file = st.file_uploader("Upload Data Folder (optional)")
+    if (data_source=="Upload Data"):
+        data_file = st.file_uploader("Upload Data Folder (optional)")
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
