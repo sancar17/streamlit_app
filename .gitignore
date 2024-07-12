@@ -13,3 +13,4 @@ tmp/
 models/
 input_images/*
 dino_with*
+data/

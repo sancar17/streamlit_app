@@ -45,8 +45,8 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     model = model.cuda()
     return model
 
-DEFAULT_MODEL_PATH = "DinoBloom-S.pth"
-DEFAULT_DATA_PATH = "data_sample/"
+DEFAULT_MODEL_PATH = "models/DinoBloom-S.pth"
+DEFAULT_DATA_PATH = "data/Bodzas/data_sample/"
 
 def load_images(data_folder):
     image_paths = []
