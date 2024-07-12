@@ -27,8 +27,9 @@ model_options = {
 }
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
     pretrained = torch.load(modelpath, map_location=torch.device('cuda:0'))
+    model = torch.hub.load('facebookresearch/dinov2', modelname)
+    
     new_state_dict = {}
     for key, value in pretrained['teacher'].items():
         if 'dino_head' in key or "ibot_head" in key:
