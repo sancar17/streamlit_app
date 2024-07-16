@@ -23,6 +23,7 @@ GDRIVE_URLS = {
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
+
 # Function to download file from Google Drive with retry logic
 def download_from_gdrive(gdrive_url, download_path, retries=3):
     for attempt in range(retries):
@@ -160,7 +161,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images
+    images = images.cuda()  # Ensure images are moved to the GPU if available
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
