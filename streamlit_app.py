@@ -121,16 +121,23 @@ def upload_and_process_features(features_file, data_source, data_file):
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
+def get_dino_bloom_model(model_path):
+    model = torch.hub.load('facebookresearch/dinov2', 'dinov2_vits14')  # Adjust this to match your actual model
+    checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+    model.load_state_dict(checkpoint)
+    model.eval()
+    return model
+
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
         st.write("Downloading model:", GDRIVE_URLS[model_key])
         model_path = f"{model_key.replace(' ', '_')}.pth"
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model = get_dino_bloom_model(model_path)
     elif model_file is not None:
         model_path = model_file.name
-        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model = get_dino_bloom_model(model_path)
     else:
         raise ValueError("Model source is required for this option.")
 
