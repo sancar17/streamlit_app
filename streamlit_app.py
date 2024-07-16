@@ -27,9 +27,11 @@ def download_from_gdrive(gdrive_url, download_path):
     gdown.download(gdrive_url, download_path, quiet=False)
 
 def load_images(data_folder):
+    print(data_folder)
     image_paths = []
     labels = []
     class_names = os.listdir(data_folder)
+    print(class_names)
     class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
     
     for cls_name in class_names:
