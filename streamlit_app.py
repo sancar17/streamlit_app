@@ -110,7 +110,8 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         y=umap_data[:, 1],
         mode='markers',
         marker=dict(size=1, opacity=0),
-        hoverinfo='none'
+        text=[class_names[label] for label in labels],
+        hoverinfo='text'
     )
     fig.add_trace(scatter)
 
@@ -123,15 +124,16 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 yref="y",
                 x=x,
                 y=y,
-                sizex=0.1,
-                sizey=0.1,
+                sizex=0.15,
+                sizey=0.15,
                 xanchor="center",
-                yanchor="middle"
+                yanchor="middle",
+                layer="above"
             )
         )
 
-    fig.update_xaxes(visible=False)
-    fig.update_yaxes(visible=False)
+    fig.update_xaxes(visible=True)
+    fig.update_yaxes(visible=True)
 
     fig.update_layout(
         title="UMAP Projection with Images",
