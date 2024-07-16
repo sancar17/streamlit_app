@@ -18,26 +18,11 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # Google Drive URLs 
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
-    "DinoBloom B": "https://drive.google.com/uc?id=1gho7OcsJlekf8Pu84blhVBFT0WoPDolc",
-    "DinoBloom L": "https://drive.google.com/uc?id=1L1ahUiQuTlpP2LItYa4JRYJwDMUnFzal",
+    "DinoBloom S": "https://drive.google.com/uc?id=1iy3K1E-lhef6iE26ewzMYPG8mwknkMHa",
+    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
-
-embed_sizes = {
-    "dinov2_vits14": 384,
-    "dinov2_vitb14": 768,
-    "dinov2_vitl14": 1024,
-    "dinov2_vitg14": 1536
-}
-
-model_options = {
-    "DinoBloom S": "dinov2_vits14",
-    "DinoBloom B": "dinov2_vitb14",
-    "DinoBloom L": "dinov2_vitl14",
-    "DinoBloom G": "dinov2_vitg14"
-}
-
 # Function to download file from Google Drive with retry logic
 def download_from_gdrive(gdrive_url, download_path, retries=3):
     for attempt in range(retries):
@@ -146,34 +131,16 @@ def upload_and_process_features(features_file, data_source, data_file):
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
-    
-    new_state_dict = {}
-    for key, value in pretrained['teacher'].items():
-        if 'dino_head' in key or "ibot_head" in key:
-            pass
-        else:
-            new_key = key.replace('backbone.', '')
-            new_state_dict[new_key] = value
-
-    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
-    model.pos_embed = pos_embed
-
-    model.load_state_dict(new_state_dict, strict=True)
-    return model
-
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
         st.write("Downloading model:", GDRIVE_URLS[model_key])
         model_path = f"{model_key.replace(' ', '_')}.pth"
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = get_dino_bloom(model_path, model_options[model_key])
+        model = torch.load(model_path, map_location=torch.device('cpu'))
     elif model_file is not None:
         model_path = model_file.name
-        model = get_dino_bloom(model_path, model_options[model_source])
+        model = torch.load(model_path, map_location=torch.device('cpu'))
     else:
         raise ValueError("Model source is required for this option.")
 
