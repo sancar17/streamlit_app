@@ -19,8 +19,8 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
-    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
-    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
+    "DinoBloom B": "https://drive.google.com/uc?id=1gho7OcsJlekf8Pu84blhVBFT0WoPDolc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1L1ahUiQuTlpP2LItYa4JRYJwDMUnFzal",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
 
