@@ -6,11 +6,10 @@ from PIL import Image, ImageFile
 import os
 import numpy as np
 import umap
-import plotly.express as px
+import plotly.graph_objects as go
 from tqdm import tqdm
 import gdown
 import zipfile
-import plotly.graph_objects as go
 import base64
 from io import BytesIO
 
@@ -94,39 +93,39 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    # Prepare images for embedding in hover data
-    encoded_images = []
+    # Prepare images for embedding in the plot
+    images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((40, 40)).convert('RGB')
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        encoded_images.append(img_str)
-    
-    # Prepare the hover text with images and class names
-    hover_texts = [
-        f'<b>Class Name:</b> {class_names[label]}<br><img src="data:image/png;base64,{img}">' 
-        for label, img in zip(labels, encoded_images)
-    ]
+        images_base64.append(f"data:image/png;base64,{img_str}")
 
     fig = go.Figure()
 
-    scatter = go.Scatter(
-        x=umap_data[:, 0],
-        y=umap_data[:, 1],
-        mode='markers',
-        marker=dict(size=10, color=labels, colorscale='Viridis', opacity=0.7),
-        text=hover_texts,
-        hoverinfo='text'
-    )
-    
-    fig.add_trace(scatter)
+    # Add images as traces
+    for img_str, (x, y) in zip(images_base64, umap_data):
+        fig.add_layout_image(
+            dict(
+                source=img_str,
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.1,
+                sizey=0.1,
+                xanchor="center",
+                yanchor="middle"
+            )
+        )
 
     fig.update_layout(
         title="UMAP Projection with Images",
         xaxis_title="UMAP 1",
         yaxis_title="UMAP 2",
-        template="plotly_white"
+        template="plotly_white",
+        showlegend=False,
     )
 
     return fig
