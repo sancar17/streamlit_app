@@ -152,7 +152,6 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     model.pos_embed = pos_embed
 
     model.load_state_dict(new_state_dict, strict=True)
-    model = model.cuda()
     return model
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
@@ -184,7 +183,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images.cuda()
+    images = images
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
