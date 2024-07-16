@@ -13,13 +13,13 @@ import zipfile
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs
-GDRIVE_URLS = {
-    "sample_data": "https://drive.google.com/uc?id=YOUR_SAMPLE_DATA_FILE_ID",
-    "DinoBloom S": "https://drive.google.com/uc?id=YOUR_DINOBLOOM_S_FILE_ID",
-    "DinoBloom B": "https://drive.google.com/uc?id=YOUR_DINOBLOOM_B_FILE_ID",
-    "DinoBloom L": "https://drive.google.com/uc?id=YOUR_DINOBLOOM_L_FILE_ID",
-    "DinoBloom G": "https://drive.google.com/uc?id=YOUR_DINOBLOOM_G_FILE_ID"
+# Google Drive URLs 
+GDRIVE_URLS = { 
+    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
+    "DinoBloom S": "https://drive.google.com/uc?id=1iy3K1E-lhef6iE26ewzMYPG8mwknkMHa",
+    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
+    "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
 
 # Function to download file from Google Drive
