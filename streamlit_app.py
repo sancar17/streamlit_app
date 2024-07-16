@@ -124,8 +124,8 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 yref="y",
                 x=x,
                 y=y,
-                sizex=0.15,
-                sizey=0.15,
+                sizex=0.3,
+                sizey=0.3,
                 xanchor="center",
                 yanchor="middle",
                 layer="above"
