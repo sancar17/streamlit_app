@@ -10,7 +10,6 @@ import plotly.express as px
 from tqdm import tqdm
 import gdown
 import zipfile
-import time
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -18,24 +17,29 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # Google Drive URLs 
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "DinoBloom S": "https://drive.google.com/uc?id=1iy3K1E-lhef6iE26ewzMYPG8mwknkMHa",
+    "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
 
-# Function to download file from Google Drive with retry logic
-def download_from_gdrive(gdrive_url, download_path, retries=3):
-    for attempt in range(retries):
-        try:
-            gdown.download(gdrive_url, download_path, quiet=False)
-            if os.path.exists(download_path):
-                break
-        except Exception as e:
-            st.write(f"Error downloading from Google Drive (attempt {attempt + 1}/{retries}): {e}")
-            time.sleep(5)  # Wait for 5 seconds before retrying
-    else:
-        st.write("Failed to download after multiple attempts.")
+embed_sizes = {
+    "dinov2_vits14": 384,
+    "dinov2_vitb14": 768,
+    "dinov2_vitl14": 1024,
+    "dinov2_vitg14": 1536
+}
+
+model_options = {
+    "DinoBloom S": "dinov2_vits14",
+    "DinoBloom B": "dinov2_vitb14",
+    "DinoBloom L": "dinov2_vitl14",
+    "DinoBloom G": "dinov2_vitg14"
+}
+
+# Function to download file from Google Drive
+def download_from_gdrive(gdrive_url, download_path):
+    gdown.download(gdrive_url, download_path, quiet=False)
 
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
@@ -132,14 +136,23 @@ def upload_and_process_features(features_file, data_source, data_file):
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-# Model architecture definition
-class DinoBloomModel(nn.Module):
-    def __init__(self, modelname="dinov2_vitb14"):
-        super(DinoBloomModel, self).__init__()
-        self.model = torch.hub.load('facebookresearch/dinov2', modelname)
+def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
+    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
+    model = torch.hub.load('facebookresearch/dinov2', modelname)
     
-    def forward(self, x):
-        return self.model(x)
+    new_state_dict = {}
+    for key, value in pretrained['teacher'].items():
+        if 'dino_head' in key or "ibot_head" in key:
+            pass
+        else:
+            new_key = key.replace('backbone.', '')
+            new_state_dict[new_key] = value
+
+    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
+    model.pos_embed = pos_embed
+
+    model.load_state_dict(new_state_dict, strict=True)
+    return model
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
@@ -147,12 +160,10 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         st.write("Downloading model:", GDRIVE_URLS[model_key])
         model_path = f"{model_key.replace(' ', '_')}.pth"
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = DinoBloomModel(model_options[model_key])
-        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        model = get_dino_bloom(model_path, model_options[model_key])
     elif model_file is not None:
         model_path = model_file.name
-        model = DinoBloomModel(model_options[model_source])
-        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+        model = get_dino_bloom(model_path, model_options[model_source])
     else:
         raise ValueError("Model source is required for this option.")
 
@@ -172,9 +183,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images.cuda()  # Ensure images are moved to the GPU if available
+    images = images
     
-    model = model.cuda()  # Move model to GPU if available
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
