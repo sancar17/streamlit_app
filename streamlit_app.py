@@ -97,7 +97,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         small_images.append(np.array(image))
 
     fig = px.scatter(
-        umap_data, x=0, y=1, color=small_images, labels={'color': 'Class'},
+        umap_data, x=0, y=1, color=labels, labels={'color': 'Class'},
         hover_data={'Class Name': [class_names[label] for label in labels]}
     )
     
