@@ -10,6 +10,7 @@ import plotly.express as px
 from tqdm import tqdm
 import gdown
 import zipfile
+import time
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -37,9 +38,18 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
-# Function to download file from Google Drive
-def download_from_gdrive(gdrive_url, download_path):
-    gdown.download(gdrive_url, download_path, quiet=False)
+# Function to download file from Google Drive with retry logic
+def download_from_gdrive(gdrive_url, download_path, retries=3):
+    for attempt in range(retries):
+        try:
+            gdown.download(gdrive_url, download_path, quiet=False)
+            if os.path.exists(download_path):
+                break
+        except Exception as e:
+            st.write(f"Error downloading from Google Drive (attempt {attempt + 1}/{retries}): {e}")
+            time.sleep(5)  # Wait for 5 seconds before retrying
+    else:
+        st.write("Failed to download after multiple attempts.")
 
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
