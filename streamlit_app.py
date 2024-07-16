@@ -96,7 +96,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     # Prepare images for embedding in the plot
     images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        image = Image.open(image_path).resize((20, 20)).convert('RGB')
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
@@ -113,12 +113,16 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 yref="y",
                 x=x,
                 y=y,
-                sizex=0.1,
-                sizey=0.1,
+                sizex=0.05,
+                sizey=0.05,
                 xanchor="center",
-                yanchor="middle"
+                yanchor="middle",
+                layer="above"
             )
         )
+
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
 
     fig.update_layout(
         title="UMAP Projection with Images",
