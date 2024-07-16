@@ -150,7 +150,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images.cuda()
+    images = images
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
