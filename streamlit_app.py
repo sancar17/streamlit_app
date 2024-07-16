@@ -132,16 +132,27 @@ def upload_and_process_features(features_file, data_source, data_file):
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
+# Model architecture definition
+class DinoBloomModel(nn.Module):
+    def __init__(self, modelname="dinov2_vitb14"):
+        super(DinoBloomModel, self).__init__()
+        self.model = torch.hub.load('facebookresearch/dinov2', modelname)
+    
+    def forward(self, x):
+        return self.model(x)
+
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
         model_key = model_source
         st.write("Downloading model:", GDRIVE_URLS[model_key])
         model_path = f"{model_key.replace(' ', '_')}.pth"
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model = DinoBloomModel(model_options[model_key])
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     elif model_file is not None:
         model_path = model_file.name
-        model = torch.load(model_path, map_location=torch.device('cpu'))
+        model = DinoBloomModel(model_options[model_source])
+        model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     else:
         raise ValueError("Model source is required for this option.")
 
@@ -161,8 +172,9 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images # Ensure images are moved to the GPU if available
+    images = images.cuda()  # Ensure images are moved to the GPU if available
     
+    model = model.cuda()  # Move model to GPU if available
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
