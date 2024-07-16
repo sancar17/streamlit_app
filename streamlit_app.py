@@ -27,15 +27,17 @@ def download_from_gdrive(gdrive_url, download_path):
     gdown.download(gdrive_url, download_path, quiet=False)
 
 def load_images(data_folder):
-    print(data_folder)
+    st.write(f"Loading images from {data_folder}")
     image_paths = []
     labels = []
-    class_names = os.listdir(data_folder)
-    print(class_names)
+    # Adjusted to look for class folders under the nested data_samples folder
+    nested_data_folder = os.path.join(data_folder, "data_samples")
+    class_names = os.listdir(nested_data_folder)
+    st.write(f"Class names found: {class_names}")
     class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
     
     for cls_name in class_names:
-        cls_folder = os.path.join(data_folder, cls_name)
+        cls_folder = os.path.join(nested_data_folder, cls_name)
         if os.path.isdir(cls_folder):
             for image_name in os.listdir(cls_folder):
                 if image_name.endswith('.bmp'):
@@ -60,6 +62,11 @@ def load_images(data_folder):
             valid_image_paths.append(image_path)
         except (OSError, IOError) as e:
             st.write(f"Skipping corrupted image: {image_path}, error: {e}")
+    
+    if not images:
+        st.write("No valid images found")
+    else:
+        st.write(f"Found {len(images)} valid images")
     
     images = torch.stack(images)
     labels = np.array(valid_labels)
@@ -151,7 +158,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-st.title("UMAP Visualization with DINOv2 Features")
+st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
 if option == "Use Features":
