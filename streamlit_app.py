@@ -6,7 +6,8 @@ from PIL import Image, ImageFile
 import os
 import numpy as np
 import umap
-import plotly.express as px
+import matplotlib.pyplot as plt
+import matplotlib.offsetbox as offsetbox
 from tqdm import tqdm
 import gdown
 import zipfile
@@ -87,30 +88,38 @@ def load_images(data_folder):
     labels = np.array(valid_labels)
     return images, labels, class_names, valid_image_paths
 
-def create_interactive_umap_with_images(data, labels, image_paths, class_names):
+def create_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
+
+    plt.figure(figsize=(20, 14))
+    ax = plt.subplot(111)
     
-    small_images = []
-    for image_path in image_paths:
-        image = Image.open(image_path).resize((2, 2)).convert('RGB')
-        small_images.append(np.array(image))
-
-    fig = px.scatter(
-        umap_data, x=0, y=1, color=labels, labels={'color': 'Class'},
-        hover_data={'Class Name': [class_names[label] for label in labels]}
-    )
+    # Plot the images at their corresponding UMAP coordinates
+    for i in range(len(umap_data)):
+        image = Image.open(image_paths[i])
+        image = image.resize((40, 40), Image.LANCZOS)  # Increase the size of the images
+        imagebox = offsetbox.AnnotationBbox(
+            offsetbox.OffsetImage(image, cmap="gray"),
+            umap_data[i],
+            frameon=False
+        )
+        ax.add_artist(imagebox)
     
-    for trace in fig.data:
-        trace.marker.size = 10
+    plt.title("UMAP Projection with Images")
+    
+    # Annotate clusters with labels
+    for label in np.unique(labels):
+        label_mask = (labels == label)
+        label_data = umap_data[label_mask]
+        x_mean, y_mean = np.mean(label_data, axis=0)
+        ax.text(x_mean, y_mean, class_names[label], fontsize=12, ha='center', va='center', bbox=dict(facecolor='white', alpha=0.5))
 
-    fig.update_layout(
-        title="Interactive UMAP Projection with Images",
-        xaxis_title="UMAP 1",
-        yaxis_title="UMAP 2"
-    )
+    ax.set_xlim(umap_data[:, 0].min() - 1, umap_data[:, 0].max() + 1)
+    ax.set_ylim(umap_data[:, 1].min() - 1, umap_data[:, 1].max() + 1)
 
-    return fig
+    plt.savefig("umap_visualization_with_images.png", bbox_inches='tight')
+    return "umap_visualization_with_images.png"
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -133,8 +142,8 @@ def upload_and_process_features(features_file, data_source, data_file):
         raise ValueError("Data source is required for this option.")
 
     _, labels, class_names, image_paths = load_images(data_path)
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
+    umap_image_path = create_umap_with_images(features, labels, image_paths, class_names)
+    return umap_image_path
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
@@ -188,8 +197,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
+    umap_image_path = create_umap_with_images(features, labels, image_paths, class_names)
+    return umap_image_path
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
@@ -203,8 +212,8 @@ if option == "Use Features":
         data_file = None
     if st.button("Visualize UMAP"):
         if features_file is not None:
-            fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig)
+            umap_image_path = upload_and_process_features(features_file, data_source, data_file)
+            st.image(umap_image_path)
         else:
             st.error("Please upload a features file.")
 else:
@@ -220,7 +229,7 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
+            umap_image_path = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.image(umap_image_path)
         else:
             st.error("Please select a model or upload a model file.")
