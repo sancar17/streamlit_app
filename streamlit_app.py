@@ -31,7 +31,7 @@ def load_images(data_folder):
     image_paths = []
     labels = []
     # Adjusted to look for class folders under the nested data_samples folder
-    nested_data_folder = os.path.join(data_folder, "data_samples")
+    nested_data_folder = os.path.join(data_folder, "data_sample")
     class_names = os.listdir(nested_data_folder)
     st.write(f"Class names found: {class_names}")
     class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
