@@ -12,3 +12,5 @@ models/
 input_images/*
 dino_with*
 data/
+secrets.txt
+yedek.py
