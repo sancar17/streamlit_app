@@ -10,6 +10,9 @@ import plotly.express as px
 from tqdm import tqdm
 import gdown
 import zipfile
+import plotly.graph_objects as go
+import base64
+from io import BytesIO
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -90,24 +93,40 @@ def load_images(data_folder):
 def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
-    
-    small_images = []
-    for image_path in image_paths:
-        image = Image.open(image_path).resize((2, 2)).convert('RGB')
-        small_images.append(np.array(image))
 
-    fig = px.scatter(
-        umap_data, x=0, y=1, color=labels, labels={'color': 'Class'},
-        hover_data={'Class Name': [class_names[label] for label in labels]}
+    # Prepare images for embedding in hover data
+    encoded_images = []
+    for image_path in image_paths:
+        image = Image.open(image_path).resize((40, 40)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        encoded_images.append(img_str)
+    
+    # Prepare the hover text with images and class names
+    hover_texts = [
+        f'<b>Class Name:</b> {class_names[label]}<br><img src="data:image/png;base64,{img}">' 
+        for label, img in zip(labels, encoded_images)
+    ]
+
+    fig = go.Figure()
+
+    scatter = go.Scatter(
+        x=umap_data[:, 0],
+        y=umap_data[:, 1],
+        mode='markers',
+        marker=dict(size=10, color=labels, colorscale='Viridis', opacity=0.7),
+        text=hover_texts,
+        hoverinfo='text'
     )
     
-    for trace in fig.data:
-        trace.marker.size = 10
+    fig.add_trace(scatter)
 
     fig.update_layout(
         title="UMAP Projection with Images",
         xaxis_title="UMAP 1",
-        yaxis_title="UMAP 2"
+        yaxis_title="UMAP 2",
+        template="plotly_white"
     )
 
     return fig
