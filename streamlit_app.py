@@ -96,7 +96,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     # Prepare images for embedding in the plot
     images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((20, 20)).convert('RGB')
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
@@ -104,7 +104,17 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     fig = go.Figure()
 
-    # Add images as traces
+    # Add a scatter plot with invisible markers to serve as image anchors
+    scatter = go.Scatter(
+        x=umap_data[:, 0],
+        y=umap_data[:, 1],
+        mode='markers',
+        marker=dict(size=1, opacity=0),
+        hoverinfo='none'
+    )
+    fig.add_trace(scatter)
+
+    # Add images at the scatter plot coordinates
     for img_str, (x, y) in zip(images_base64, umap_data):
         fig.add_layout_image(
             dict(
@@ -113,11 +123,10 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 yref="y",
                 x=x,
                 y=y,
-                sizex=0.05,
-                sizey=0.05,
+                sizex=0.1,
+                sizey=0.1,
                 xanchor="center",
-                yanchor="middle",
-                layer="above"
+                yanchor="middle"
             )
         )
 
