@@ -6,15 +6,17 @@ from PIL import Image, ImageFile
 import os
 import numpy as np
 import umap
+import plotly.graph_objects as go
 from tqdm import tqdm
 import gdown
 import zipfile
 import base64
 from io import BytesIO
-from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.embed import components as bokeh_components
-import streamlit.components.v1 as st_components
+from dash import Dash, dcc, html, Input, Output, no_update, State
+import dash
+import plotly.graph_objects as go
+import pandas as pd
+import json
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -105,32 +107,48 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
 
-    source = ColumnDataSource(data=dict(
+    fig = go.Figure()
+
+    # Add a scatter plot with invisible markers to serve as image anchors
+    scatter = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
-        image=images_base64,
-        label=[class_names[label] for label in labels]
-    ))
+        mode='markers',
+        marker=dict(size=1, opacity=0),
+        text=[class_names[label] for label in labels],
+        hoverinfo='text'
+    )
+    fig.add_trace(scatter)
 
-    hover_tool = HoverTool(
-        tooltips="""
-        <div>
-            <div>
-                <img src="@image" style="width: 150px; height: 150px;" />
-            </div>
-            <div>
-                <span style="font-size: 12px;">Label: @label</span>
-            </div>
-        </div>
-        """
+    # Add images at the scatter plot coordinates
+    for img_str, (x, y) in zip(images_base64, umap_data):
+        fig.add_layout_image(
+            dict(
+                source=img_str,
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.3,
+                sizey=0.3,
+                xanchor="center",
+                yanchor="middle",
+                layer="above"
+            )
+        )
+
+    fig.update_xaxes(visible=True)
+    fig.update_yaxes(visible=True)
+
+    fig.update_layout(
+        title="UMAP Projection with Images",
+        xaxis_title="UMAP 1",
+        yaxis_title="UMAP 2",
+        template="plotly_white",
+        showlegend=False,
     )
 
-    p = figure(width=800, height=600, tools=[hover_tool], title="UMAP Projection with Images")
-    p.circle('x', 'y', source=source, size=10, alpha=0.5)
-    p.xaxis.axis_label = 'UMAP 1'
-    p.yaxis.axis_label = 'UMAP 2'
-
-    return p
+    return fig
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -224,10 +242,7 @@ if option == "Use Features":
     if st.button("Visualize UMAP"):
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
-            script, div = bokeh_components(fig)  # Use the correct components import
-            st.write(f"Script: {script}")  # Debugging print
-            st.write(f"Div: {div}")        # Debugging print
-            st_components.html(div + script, height=800)  # Corrected method call
+            st.plotly_chart(fig)
         else:
             st.error("Please upload a features file.")
 else:
@@ -243,14 +258,90 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            st.write("a")
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.write("b")
-            script, div = bokeh_components(fig)  # Use the correct components import
-            #st.write(f"Script: {script}")  # Debugging print
-            #st.write(f"Div: {div}")        # Debugging print
-            st.write("c")
-            st_components.html(div + script, height=800)  # Corrected method call
-            st.write("umap should be visible now")
+            st.plotly_chart(fig)
         else:
             st.error("Please select a model or upload a model file.")
+
+# Creating a Dash app inside the Streamlit app
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+external_scripts = [{'src':"https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"}]
+
+app = Dash(__name__, server=False, external_scripts=external_scripts, external_stylesheets=external_stylesheets)
+
+# Example dataset for demonstration
+df = pd.DataFrame({
+    'x': [1, 2, 3],
+    'y': [1, 3, 2],
+    'text': ['A', 'B', 'C'],
+    'img_url': ['https://via.placeholder.com/150', 'https://via.placeholder.com/150', 'https://via.placeholder.com/150']
+})
+
+fig = go.Figure(data=[
+    go.Scatter(
+        x=df["x"],
+        y=df["y"],
+        mode="markers",
+        marker=dict(size=15, color="LightSeaGreen"),
+        text=df["text"]
+    )
+])
+
+fig.update_traces(hoverinfo="none", hovertemplate=None)
+
+fig.update_layout(
+    xaxis=dict(title='X Axis'),
+    yaxis=dict(title='Y Axis')
+)
+
+app.layout = html.Div([
+    dcc.Graph(id="graph-basic-2", figure=fig, clear_on_unhover=True),
+    dcc.Tooltip(id="graph-tooltip"),
+    dcc.Store(id='graph-basic-2-data', data=df.to_dict('records'))
+])
+
+app.clientside_callback(
+    """
+    function showHover(hv, data) {
+        if (hv) {
+            pt = hv["points"][0]
+            bbox = pt["bbox"]
+            num = pt["pointNumber"]
+        
+            df_row = data[num]
+            img_src = df_row['img_url']
+            name = df_row['text']
+            
+            img = jQuery(
+                "<img>", {
+                    src: img_src,
+                    style: "width:100%"
+                }
+            )
+            
+            ttl = jQuery("<h2>", {text: name})
+            
+            newDiv = jQuery("<div>", {
+                style: 'width:200px;white-space:normal'
+            })
+            
+            $(newDiv).append(img)
+            $(newDiv).append(ttl)
+            
+            $('#graph-tooltip').empty()
+            
+            $('#graph-tooltip').append($(newDiv))
+        
+            return [true, bbox]
+        }
+        return [false, dash_clientside.no_update]
+    }
+    """,
+    Output("graph-tooltip", "show"),
+    Output("graph-tooltip", "bbox"),
+    Input("graph-basic-2", "hoverData"),
+    State('graph-basic-2-data', 'data')
+)
+
+if __name__ == "__main__":
+    app.run_server(debug=True)

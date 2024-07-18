@@ -9,3 +9,4 @@ tqdm
 gdown
 matplotlib
 bokeh
+dash
