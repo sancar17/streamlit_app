@@ -217,6 +217,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     script, div = components(umap_fig)
+    st.write(div, unsafe_allow_html=True)
+    st.write(script, unsafe_allow_html=True)
     return script, div
 
 st.title("UMAP Visualization with DinoBloom Features")
@@ -253,5 +255,6 @@ else:
             script, div = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.write(div, unsafe_allow_html=True)
             st.write(script, unsafe_allow_html=True)
+            st.write("umap generated")
         else:
             st.error("Please select a model or upload a model file.")
