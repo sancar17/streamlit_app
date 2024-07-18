@@ -14,7 +14,6 @@ from io import BytesIO
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.embed import components
-import streamlit.components.v1 as components  # Correct import for components
 
 
 # Enable loading of truncated images
@@ -247,3 +246,4 @@ else:
             st.components.v1.html(div + script, height=800)  # Corrected method call
         else:
             st.error("Please select a model or upload a model file.")
+
