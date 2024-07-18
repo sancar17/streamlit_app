@@ -15,7 +15,6 @@ from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.embed import components
 
-
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -213,7 +212,6 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
-
 if option == "Use Features":
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
@@ -225,7 +223,9 @@ if option == "Use Features":
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
             script, div = components(fig)
-            st.components.v1.html(div + script, height=800)  # Corrected method call
+            st.write(f"Script: {script}")
+            st.write(f"Div: {div}")
+            st.components.v1.html(div + script, height=800)
         else:
             st.error("Please upload a features file.")
 else:
@@ -245,9 +245,10 @@ else:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.write("b")
             script, div = components(fig)
+            st.write(f"Script: {script}")
+            st.write(f"Div: {div}")
             st.write("c")
-            st.components.v1.html(div + script, height=800)  # Corrected method call
+            st.components.v1.html(div + script, height=800)
             st.write("umap should be visible now")
         else:
             st.error("Please select a model or upload a model file.")
-
