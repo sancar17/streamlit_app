@@ -105,28 +105,52 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
 
-    source = ColumnDataSource(data=dict(
+    fig = go.Figure()
+
+    # Add a scatter plot with invisible markers to serve as image anchors
+    scatter = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
-        image=images_base64,
-        class_name=[class_names[label] for label in labels]
-    ))
+        mode='markers',
+        marker=dict(size=1, opacity=0),
+        text=[class_names[label] for label in labels],
+        hoverinfo='text'
+    )
+    fig.add_trace(scatter)
 
-    hover = HoverTool(tooltips="""
-        <div>
-            <div>
-                <img src="@image" style="width:100px;height:100px;" />
-            </div>
-            <div>
-                <span style="font-size: 12px;">@class_name</span>
-            </div>
-        </div>
-    """)
+    # Add images at the scatter plot coordinates
+    for img_str, (x, y) in zip(images_base64, umap_data):
+        fig.add_layout_image(
+            dict(
+                source=img_str,
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.3,
+                sizey=0.3,
+                xanchor="center",
+                yanchor="middle",
+                layer="above",
+                sizing="contain",
+                opacity=1,
+                hovertemplate=f'<img src="{img_str}" style="width:150px;height:150px;"><extra></extra>'
+            )
+        )
 
-    p = figure(plot_width=800, plot_height=800, tools=[hover], title="UMAP Projection with Images")
-    p.circle('x', 'y', size=10, source=source, fill_alpha=0)
+    fig.update_xaxes(visible=True)
+    fig.update_yaxes(visible=True)
 
-    return p
+    fig.update_layout(
+        title="UMAP Projection with Images",
+        xaxis_title="UMAP 1",
+        yaxis_title="UMAP 2",
+        template="plotly_white",
+        showlegend=False,
+        hovermode='closest'
+    )
+
+    return fig
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
