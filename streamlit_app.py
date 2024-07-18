@@ -12,6 +12,7 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
+import streamlit.components.v1 as components
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -143,6 +144,17 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         showlegend=False,
     )
 
+    # Add hover template and JavaScript for enlarging hovered images
+    fig.update_traces(hovertemplate="<extra></extra>")
+    fig.update_layout(
+        hovermode='closest',
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=16,
+            font_family="Rockwell"
+        )
+    )
+
     return fig
 
 def upload_and_process_features(features_file, data_source, data_file):
@@ -224,6 +236,28 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
+import streamlit.components.v1 as components
+
+# JavaScript to enlarge images on hover
+hover_script = """
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const imageContainers = document.querySelectorAll('.plotly .layer-above image');
+
+    imageContainers.forEach(img => {
+        img.addEventListener('mouseenter', () => {
+            img.setAttribute('width', '100');
+            img.setAttribute('height', '100');
+        });
+        img.addEventListener('mouseleave', () => {
+            img.setAttribute('width', '50');
+            img.setAttribute('height', '50');
+        });
+    });
+});
+</script>
+"""
+
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
@@ -238,6 +272,7 @@ if option == "Use Features":
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
             st.plotly_chart(fig)
+            components.html(hover_script)
         else:
             st.error("Please upload a features file.")
 else:
@@ -255,5 +290,6 @@ else:
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.plotly_chart(fig)
+            components.html(hover_script)
         else:
             st.error("Please select a model or upload a model file.")
