@@ -241,10 +241,13 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
+            st.write("a")
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.write("b")
             script, div = components(fig)
+            st.write("c")
             st.components.v1.html(div + script, height=800)  # Corrected method call
-            print("umap should be visible now")
+            st.write("umap should be visible now")
         else:
             st.error("Please select a model or upload a model file.")
 
