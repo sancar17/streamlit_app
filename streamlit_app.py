@@ -244,6 +244,7 @@ else:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             script, div = components(fig)
             st.components.v1.html(div + script, height=800)  # Corrected method call
+            print("umap should be visible now")
         else:
             st.error("Please select a model or upload a model file.")
 
