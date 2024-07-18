@@ -6,13 +6,15 @@ from PIL import Image, ImageFile
 import os
 import numpy as np
 import umap
-import plotly.graph_objects as go
 from tqdm import tqdm
 import gdown
 import zipfile
 import base64
 from io import BytesIO
-import streamlit.components.v1 as components
+from bokeh.plotting import figure, show
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh.resources import INLINE
+from bokeh.embed import components
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -103,49 +105,28 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
 
-    fig = go.Figure()
-
-    # Add a scatter plot with invisible markers to serve as image anchors
-    scatter = go.Scatter(
+    source = ColumnDataSource(data=dict(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
-        mode='markers',
-        marker=dict(size=1, opacity=0),
-        text=[class_names[label] for label in labels],
-        hoverinfo='text'
-    )
-    fig.add_trace(scatter)
+        image=images_base64,
+        class_name=[class_names[label] for label in labels]
+    ))
 
-    # Add images at the scatter plot coordinates
-    for img_str, (x, y) in zip(images_base64, umap_data):
-        fig.add_layout_image(
-            dict(
-                source=img_str,
-                xref="x",
-                yref="y",
-                x=x,
-                y=y,
-                sizex=0.3,
-                sizey=0.3,
-                xanchor="center",
-                yanchor="middle",
-                layer="above"
-            )
-        )
+    hover = HoverTool(tooltips="""
+        <div>
+            <div>
+                <img src="@image" style="width:100px;height:100px;" />
+            </div>
+            <div>
+                <span style="font-size: 12px;">@class_name</span>
+            </div>
+        </div>
+    """)
 
-    fig.update_xaxes(visible=True)
-    fig.update_yaxes(visible=True)
+    p = figure(plot_width=800, plot_height=800, tools=[hover], title="UMAP Projection with Images")
+    p.circle('x', 'y', size=10, source=source, fill_alpha=0)
 
-    fig.update_layout(
-        title="UMAP Projection with Images",
-        xaxis_title="UMAP 1",
-        yaxis_title="UMAP 2",
-        template="plotly_white",
-        showlegend=False,
-    )
-
-    return fig
-
+    return p
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -226,35 +207,6 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-import streamlit.components.v1 as components
-
-# JavaScript and CSS to enlarge images on hover and show class names
-hover_script = """
-<style>
-.image-hover img {
-    transition: transform 0.2s;
-}
-
-.image-hover img:hover {
-    transform: scale(2);
-}
-</style>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const imageContainers = document.querySelectorAll('.plotly .layer-above image');
-
-    imageContainers.forEach(img => {
-        img.addEventListener('mouseenter', () => {
-            img.style.transform = 'scale(2)';
-        });
-        img.addEventListener('mouseleave', () => {
-            img.style.transform = 'scale(1)';
-        });
-    });
-});
-</script>
-"""
-
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
@@ -268,8 +220,9 @@ if option == "Use Features":
     if st.button("Visualize UMAP"):
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig)
-            components.html(hover_script)
+            script, div = components(fig)
+            st.write(div, unsafe_allow_html=True)
+            st.write(script, unsafe_allow_html=True)
         else:
             st.error("Please upload a features file.")
 else:
@@ -286,7 +239,8 @@ else:
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
-            components.html(hover_script)
+            script, div = components(fig)
+            st.write(div, unsafe_allow_html=True)
+            st.write(script, unsafe_allow_html=True)
         else:
             st.error("Please select a model or upload a model file.")

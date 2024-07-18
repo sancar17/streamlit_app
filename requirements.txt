@@ -8,3 +8,4 @@ plotly
 tqdm
 gdown
 matplotlib
+bokeh
