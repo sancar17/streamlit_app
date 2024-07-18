@@ -15,6 +15,7 @@ from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.resources import INLINE
 from bokeh.embed import components
+import plotly.graph_objects as go
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
