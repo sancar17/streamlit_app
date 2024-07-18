@@ -96,6 +96,9 @@ def load_images(data_folder):
     labels = np.array(valid_labels)
     return images, labels, class_names, valid_image_paths
 
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, HoverTool
+
 def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
@@ -129,7 +132,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         """
     )
 
-    p = figure(plot_width=800, plot_height=600, tools=[hover_tool], title="UMAP Projection with Images")
+    p = figure(width=800, height=600, tools=[hover_tool], title="UMAP Projection with Images")
     p.circle('x', 'y', source=source, size=10, alpha=0.5)
     p.xaxis.axis_label = 'UMAP 1'
     p.yaxis.axis_label = 'UMAP 2'
