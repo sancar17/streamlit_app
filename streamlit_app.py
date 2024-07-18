@@ -11,11 +11,6 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-from bokeh.plotting import figure, show
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.resources import INLINE
-from bokeh.embed import components
-import plotly.graph_objects as go
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.embed import components
@@ -95,9 +90,6 @@ def load_images(data_folder):
     images = torch.stack(images)
     labels = np.array(valid_labels)
     return images, labels, class_names, valid_image_paths
-
-from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool
 
 def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
@@ -216,10 +208,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         features = model(images).cpu().numpy()
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    script, div = components(umap_fig)
-    st.write(div, unsafe_allow_html=True)
-    st.write(script, unsafe_allow_html=True)
-    return script, div
+    return umap_fig
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
@@ -235,8 +224,7 @@ if option == "Use Features":
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
             script, div = components(fig)
-            st.write(div, unsafe_allow_html=True)
-            st.write(script, unsafe_allow_html=True)
+            components.html(div + script, height=800)
         else:
             st.error("Please upload a features file.")
 else:
@@ -252,9 +240,8 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            script, div = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.write(div, unsafe_allow_html=True)
-            st.write(script, unsafe_allow_html=True)
-            st.write("umap generated")
+            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            script, div = components(fig)
+            components.html(div + script, height=800)
         else:
             st.error("Please select a model or upload a model file.")
