@@ -247,8 +247,8 @@ else:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.write("b")
             script, div = bokeh_components(fig)  # Use the correct components import
-            st.write(f"Script: {script}")  # Debugging print
-            st.write(f"Div: {div}")        # Debugging print
+            #st.write(f"Script: {script}")  # Debugging print
+            #st.write(f"Div: {div}")        # Debugging print
             st.write("c")
             st_components.html(div + script, height=800)  # Corrected method call
             st.write("umap should be visible now")
