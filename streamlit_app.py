@@ -144,18 +144,8 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         showlegend=False,
     )
 
-    # Add hover template and JavaScript for enlarging hovered images
-    fig.update_traces(hovertemplate="<extra></extra>")
-    fig.update_layout(
-        hovermode='closest',
-        hoverlabel=dict(
-            bgcolor="white",
-            font_size=16,
-            font_family="Rockwell"
-        )
-    )
-
     return fig
+
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -238,20 +228,27 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
 
 import streamlit.components.v1 as components
 
-# JavaScript to enlarge images on hover
+# JavaScript and CSS to enlarge images on hover and show class names
 hover_script = """
+<style>
+.image-hover img {
+    transition: transform 0.2s;
+}
+
+.image-hover img:hover {
+    transform: scale(2);
+}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const imageContainers = document.querySelectorAll('.plotly .layer-above image');
 
     imageContainers.forEach(img => {
         img.addEventListener('mouseenter', () => {
-            img.setAttribute('width', '100');
-            img.setAttribute('height', '100');
+            img.style.transform = 'scale(2)';
         });
         img.addEventListener('mouseleave', () => {
-            img.setAttribute('width', '50');
-            img.setAttribute('height', '50');
+            img.style.transform = 'scale(1)';
         });
     });
 });
