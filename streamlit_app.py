@@ -16,6 +16,9 @@ from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.resources import INLINE
 from bokeh.embed import components
 import plotly.graph_objects as go
+from bokeh.plotting import figure
+from bokeh.models import ColumnDataSource, HoverTool
+from bokeh import components
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -106,52 +109,32 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
 
-    fig = go.Figure()
-
-    # Add a scatter plot with invisible markers to serve as image anchors
-    scatter = go.Scatter(
+    source = ColumnDataSource(data=dict(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
-        mode='markers',
-        marker=dict(size=1, opacity=0),
-        text=[class_names[label] for label in labels],
-        hoverinfo='text'
-    )
-    fig.add_trace(scatter)
+        image=images_base64,
+        label=[class_names[label] for label in labels]
+    ))
 
-    # Add images at the scatter plot coordinates
-    for img_str, (x, y) in zip(images_base64, umap_data):
-        fig.add_layout_image(
-            dict(
-                source=img_str,
-                xref="x",
-                yref="y",
-                x=x,
-                y=y,
-                sizex=0.3,
-                sizey=0.3,
-                xanchor="center",
-                yanchor="middle",
-                layer="above",
-                sizing="contain",
-                opacity=1,
-                hovertemplate=f'<img src="{img_str}" style="width:150px;height:150px;"><extra></extra>'
-            )
-        )
-
-    fig.update_xaxes(visible=True)
-    fig.update_yaxes(visible=True)
-
-    fig.update_layout(
-        title="UMAP Projection with Images",
-        xaxis_title="UMAP 1",
-        yaxis_title="UMAP 2",
-        template="plotly_white",
-        showlegend=False,
-        hovermode='closest'
+    hover_tool = HoverTool(
+        tooltips="""
+        <div>
+            <div>
+                <img src="@image" style="width: 150px; height: 150px;" />
+            </div>
+            <div>
+                <span style="font-size: 12px;">Label: @label</span>
+            </div>
+        </div>
+        """
     )
 
-    return fig
+    p = figure(plot_width=800, plot_height=600, tools=[hover_tool], title="UMAP Projection with Images")
+    p.circle('x', 'y', source=source, size=10, alpha=0.5)
+    p.xaxis.axis_label = 'UMAP 1'
+    p.yaxis.axis_label = 'UMAP 2'
+
+    return p
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -230,7 +213,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         features = model(images).cpu().numpy()
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
+    script, div = components(umap_fig)
+    return script, div
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
@@ -263,8 +247,7 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            script, div = components(fig)
+            script, div = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.write(div, unsafe_allow_html=True)
             st.write(script, unsafe_allow_html=True)
         else:
