@@ -14,7 +14,8 @@ from io import BytesIO
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.embed import components
-import streamlit.components.v1 as components  # Use the correct module
+import streamlit.components.v1 as components  # Correct import for components
+
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -225,7 +226,7 @@ if option == "Use Features":
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
             script, div = components(fig)
-            components.html(div + script, height=800)
+            st.components.v1.html(div + script, height=800)  # Corrected method call
         else:
             st.error("Please upload a features file.")
 else:
@@ -243,7 +244,6 @@ else:
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             script, div = components(fig)
-            components.html(div + script, height=800)
-            st.write("CREATED UMAP")
+            st.components.v1.html(div + script, height=800)  # Corrected method call
         else:
             st.error("Please select a model or upload a model file.")
