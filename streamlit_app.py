@@ -183,8 +183,12 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     else:
         st.write("Using model from the cloud.")
     
-    model = torch.load(model_path, map_location=torch.device('cpu'))
-
+    # Load the model architecture and load the state dictionary
+    state_dict = torch.load(model_path, map_location=torch.device('cpu'))
+    model_name = model_key.split()[1].lower()  # Extract model name key
+    model = torch.hub.load('facebookresearch/dinov2', model_name)
+    model.load_state_dict(state_dict)
+    
     data_path = "/mount/src/streamlit_app/sample_data"
     if not check_if_directory_exists(data_path):
         st.write("Downloading data sample...")
@@ -202,6 +206,7 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
+
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
