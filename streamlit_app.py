@@ -140,19 +140,22 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
+    # Create a color map
+    unique_labels = list(set(labels))
+    color_map = {label: Spectral10[i % 10] for i, label in enumerate(unique_labels)}
+    colors = [color_map[label] for label in labels]
+
     source = ColumnDataSource(data=dict(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
         label=[class_names[label] for label in labels],
+        color=colors,
         image_url=image_paths
     ))
 
     p = figure(title="UMAP Projection with Images", width=800, height=600)
     
-    color_mapper = {name: color for name, color in zip(set(class_names), Spectral10)}
-    colors = [color_mapper[class_names[label]] for label in labels]
-    
-    p.scatter('x', 'y', size=10, color=colors, alpha=0.6, source=source)
+    p.scatter('x', 'y', size=10, color='color', alpha=0.6, source=source)
 
     hover = HoverTool(tooltips="""
         <div>
@@ -169,30 +172,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     return p
 
-def create_hover_component():
-    components.html(
-        """
-        <div id="hover-image" style="position: fixed; display: none; z-index: 9999;"></div>
-        <script>
-        const plotlyDiv = document.querySelector('.js-plotly-plot');
-        const hoverDiv = document.getElementById('hover-image');
-
-        plotlyDiv.on('plotly_hover', function(data) {
-            const point = data.points[0];
-            const imagePath = point.fullData.customdata[point.pointIndex];
-            hoverDiv.innerHTML = `<img src="${imagePath}" width="200" height="200">`;
-            hoverDiv.style.display = 'block';
-            hoverDiv.style.left = (point.pageX + 10) + 'px';
-            hoverDiv.style.top = (point.pageY + 10) + 'px';
-        });
-
-        plotlyDiv.on('plotly_unhover', function() {
-            hoverDiv.style.display = 'none';
-        });
-        </script>
-        """,
-        height=0,
-    )
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
         features = np.load(features_file)
