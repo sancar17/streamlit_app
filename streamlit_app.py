@@ -23,11 +23,11 @@ GDRIVE_URLS = {
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "dinov2_vits14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vits14",
-    "dinov2_vitb14_state_dict": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
+    "dinov2_vits14_state_dict": "https://drive.google.com/uc?id=16wuvnYTqivDQvHINzt0cJ-1dQRx4HI21",
+    "dinov2_vitb14_state_dict": "yok",
     "dinov2_vitl14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vitl14",
     "dinov2_vitg14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vitg14",
-    "dinov2_vits14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vits14",
+    "dinov2_vits14_architecture": "https://drive.google.com/uc?id=1KIwe7WEAXCRXN-B-BuPKUvtotd7n5Uag",
     "dinov2_vitb14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitb14",
     "dinov2_vitl14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitl14",
     "dinov2_vitg14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitg14"
@@ -58,7 +58,7 @@ def check_if_directory_exists(dirpath):
 # Function to list files in a directory
 def list_files_in_directory(directory, file_extension=None):
 
-    removed_files = remove_pt_pth_files(directory)
+    #removed_files = remove_pt_pth_files(directory)
 
     try:
         files = os.listdir(directory)
