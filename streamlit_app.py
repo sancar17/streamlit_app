@@ -33,6 +33,16 @@ GDRIVE_URLS = {
     "dinov2_vitg14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitg14"
 }
 
+def remove_pt_pth_files(directory):
+    removed_files = []
+    for file_name in os.listdir(directory):
+        if file_name.endswith('.pt') or file_name.endswith('.pth'):
+            file_path = os.path.join(directory, file_name)
+            os.remove(file_path)
+            removed_files.append(file_path)
+    return removed_files
+
+
 # Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
     gdown.download(gdrive_url, download_path, quiet=False)
@@ -47,6 +57,9 @@ def check_if_directory_exists(dirpath):
 
 # Function to list files in a directory
 def list_files_in_directory(directory, file_extension=None):
+
+    removed_files = remove_pt_pth_files(directory)
+
     try:
         files = os.listdir(directory)
         if file_extension:
