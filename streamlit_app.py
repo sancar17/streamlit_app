@@ -39,6 +39,23 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
+# Function to list files in a directory
+def list_files_in_directory(directory):
+    try:
+        files = os.listdir(directory)
+        return files
+    except FileNotFoundError:
+        return f"Directory {directory} not found."
+    except Exception as e:
+        return str(e)
+
+# Display files in the directories
+st.write("Files in /mount/src/streamlit_app:")
+st.write(list_files_in_directory("/mount/src/streamlit_app"))
+
+st.write("Files in /mount/src/streamlit_app/sample_data:")
+st.write(list_files_in_directory("/mount/src/streamlit_app/sample_data"))
+
 # Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
     gdown.download(gdrive_url, download_path, quiet=False)
@@ -170,12 +187,8 @@ def upload_and_process_features(features_file, data_source, data_file):
     return umap_fig
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    try:
-        pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
-        model = torch.hub.load('facebookresearch/dinov2', modelname)
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        return None
+    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
+    model = torch.hub.load('facebookresearch/dinov2', modelname)
     
     new_state_dict = {}
     for key, value in pretrained['teacher'].items():
@@ -190,7 +203,6 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
 
     model.load_state_dict(new_state_dict, strict=True)
     return model
-
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
     if model_source != "Upload Model":
