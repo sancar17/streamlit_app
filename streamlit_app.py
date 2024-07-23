@@ -152,8 +152,8 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         mode='markers',
         marker=dict(size=1, opacity=0),
         text=[class_names[label] for label in labels],
-        hoverinfo='text',
-        hovertemplate='<br><b>%{text}</b><br>' +
+        hoverinfo='none',
+        hovertemplate='<b>%{text}</b><br>' +
                       '<img src="%{customdata}" style="width:200px;height:200px;"><extra></extra>',
         customdata=hover_images
     )
@@ -187,6 +187,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
 
     return fig
+
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
