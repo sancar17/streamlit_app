@@ -12,16 +12,11 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-from dash import Dash, dcc, html, Input, Output, no_update, State
-import dash
-import plotly.graph_objects as go
-import pandas as pd
-import json
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs
+# Google Drive URLs 
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
@@ -262,86 +257,3 @@ else:
             st.plotly_chart(fig)
         else:
             st.error("Please select a model or upload a model file.")
-
-# Creating a Dash app inside the Streamlit app
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-external_scripts = [{'src':"https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"}]
-
-app = Dash(__name__, server=False, external_scripts=external_scripts, external_stylesheets=external_stylesheets)
-
-# Example dataset for demonstration
-df = pd.DataFrame({
-    'x': [1, 2, 3],
-    'y': [1, 3, 2],
-    'text': ['A', 'B', 'C'],
-    'img_url': ['https://via.placeholder.com/150', 'https://via.placeholder.com/150', 'https://via.placeholder.com/150']
-})
-
-fig = go.Figure(data=[
-    go.Scatter(
-        x=df["x"],
-        y=df["y"],
-        mode="markers",
-        marker=dict(size=15, color="LightSeaGreen"),
-        text=df["text"]
-    )
-])
-
-fig.update_traces(hoverinfo="none", hovertemplate=None)
-
-fig.update_layout(
-    xaxis=dict(title='X Axis'),
-    yaxis=dict(title='Y Axis')
-)
-
-app.layout = html.Div([
-    dcc.Graph(id="graph-basic-2", figure=fig, clear_on_unhover=True),
-    dcc.Tooltip(id="graph-tooltip"),
-    dcc.Store(id='graph-basic-2-data', data=df.to_dict('records'))
-])
-
-app.clientside_callback(
-    """
-    function showHover(hv, data) {
-        if (hv) {
-            pt = hv["points"][0]
-            bbox = pt["bbox"]
-            num = pt["pointNumber"]
-        
-            df_row = data[num]
-            img_src = df_row['img_url']
-            name = df_row['text']
-            
-            img = jQuery(
-                "<img>", {
-                    src: img_src,
-                    style: "width:100%"
-                }
-            )
-            
-            ttl = jQuery("<h2>", {text: name})
-            
-            newDiv = jQuery("<div>", {
-                style: 'width:200px;white-space:normal'
-            })
-            
-            $(newDiv).append(img)
-            $(newDiv).append(ttl)
-            
-            $('#graph-tooltip').empty()
-            
-            $('#graph-tooltip').append($(newDiv))
-        
-            return [true, bbox]
-        }
-        return [false, dash_clientside.no_update]
-    }
-    """,
-    Output("graph-tooltip", "show"),
-    Output("graph-tooltip", "bbox"),
-    Input("graph-basic-2", "hoverData"),
-    State('graph-basic-2-data', 'data')
-)
-
-if __name__ == "__main__":
-    app.run_server(debug=True)
