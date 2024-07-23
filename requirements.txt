@@ -10,3 +10,4 @@ gdown
 matplotlib
 bokeh
 dash
+dinov2
