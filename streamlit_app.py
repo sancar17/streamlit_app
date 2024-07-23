@@ -12,7 +12,6 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-#
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -132,12 +131,18 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     umap_data = reducer.fit_transform(data)
 
     images_base64 = []
+    hover_images = []
     for image_path in image_paths:
         image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        large_image = Image.open(image_path).resize((200, 200)).convert('RGB')  # Larger version for hover
         buffered = BytesIO()
+        large_buffered = BytesIO()
         image.save(buffered, format="PNG")
+        large_image.save(large_buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
+        hover_images.append(f"data:image/png;base64,{large_img_str}")
 
     fig = go.Figure()
 
@@ -147,7 +152,10 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         mode='markers',
         marker=dict(size=1, opacity=0),
         text=[class_names[label] for label in labels],
-        hoverinfo='text'
+        hoverinfo='text',
+        hovertemplate='<br><b>%{text}</b><br>' +
+                      '<img src="%{customdata}" style="width:200px;height:200px;"><extra></extra>',
+        customdata=hover_images
     )
     fig.add_trace(scatter)
 
