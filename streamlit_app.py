@@ -12,6 +12,7 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
+import dinov2
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -76,16 +77,16 @@ model_options = {
 
 def load_model_architecture(modelname):
     if modelname == "dinov2_vits14":
-        from facebookresearch.dinov2 import dinov2_vits14
+        from dinov2 import dinov2_vits14
         return dinov2_vits14()
     elif modelname == "dinov2_vitb14":
-        from facebookresearch.dinov2 import dinov2_vitb14
+        from dinov2 import dinov2_vitb14
         return dinov2_vitb14()
     elif modelname == "dinov2_vitl14":
-        from facebookresearch.dinov2 import dinov2_vitl14
+        from dinov2 import dinov2_vitl14
         return dinov2_vitl14()
     elif modelname == "dinov2_vitg14":
-        from facebookresearch.dinov2 import dinov2_vitg14
+        from dinov2 import dinov2_vitg14
         return dinov2_vitg14()
     else:
         raise ValueError(f"Unknown model name: {modelname}")
