@@ -16,13 +16,6 @@ from io import BytesIO
 import streamlit.components.v1 as components
 import json
 
-import streamlit as st
-from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.palettes import Spectral10
-from bokeh.embed import json_item
-import json
-
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -140,34 +133,49 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    source = ColumnDataSource(data=dict(
-        x=umap_data[:, 0],
-        y=umap_data[:, 1],
-        label=[class_names[label] for label in labels],
-        image_url=image_paths
-    ))
+    fig = go.Figure()
 
-    p = figure(title="UMAP Projection with Images", width=800, height=600)
-    
-    color_mapper = {name: color for name, color in zip(set(class_names), Spectral10)}
-    colors = [color_mapper[class_names[label]] for label in labels]
-    
-    p.scatter('x', 'y', size=10, color=colors, alpha=0.6, source=source)
+    for (x, y), label, image_path in zip(umap_data, labels, image_paths):
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    hover = HoverTool(tooltips="""
-        <div>
-            <div>
-                <img src="@image_url" style="width: 200px; height: 200px;"/>
-            </div>
-            <div>
-                <span style="font-size: 12px; color: #966;">@label</span>
-            </div>
-        </div>
-    """)
+        fig.add_trace(go.Scatter(
+            x=[x],
+            y=[y],
+            mode='markers',
+            marker=dict(size=10, opacity=0.7),
+            text=f"Class: {class_names[label]}",
+            hoverinfo='text',
+            showlegend=False
+        ))
 
-    p.add_tools(hover)
+        fig.add_layout_image(
+            dict(
+                source=f"data:image/png;base64,{img_str}",
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.1,
+                sizey=0.1,
+                xanchor="center",
+                yanchor="middle",
+                layer="above"
+            )
+        )
 
-    return p
+    fig.update_layout(
+        title="UMAP Projection with Images",
+        xaxis_title="UMAP 1",
+        yaxis_title="UMAP 2",
+        template="plotly_white",
+        showlegend=False,
+        hovermode='closest'
+    )
+
+    return fig
 
 def create_hover_component():
     components.html(
@@ -260,8 +268,8 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
-    bokeh_plot = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return bokeh_plot
+    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return umap_fig
 
 # Streamlit app
 st.title("UMAP Visualization with DinoBloom Features")
@@ -300,7 +308,8 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            bokeh_plot = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.bokeh_chart(bokeh_plot)
+            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.plotly_chart(fig, use_container_width=True)
+            create_hover_component()
         else:
             st.error("Please select a model or upload a model file.")
