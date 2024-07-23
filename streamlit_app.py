@@ -22,8 +22,11 @@ GDRIVE_URLS = {
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
-    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP"
+    "dinov2_vits14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vits14",
+    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=1E9TORPo6NJ2cJ8PT_PNSuLTHIUhePXsx",
+    "dinov2_vitl14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vitl14",
+    "dinov2_vitg14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vitg14",
+    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH"
 }
 
 # Function to download file from Google Drive
@@ -79,26 +82,18 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
     
     # Check if the model architecture exists locally
-    local_model_path = f"/mount/src/streamlit_app/{modelname}_architecture.pth"
-    if not check_if_file_exists(local_model_path):
+    local_model_arch_path = f"/mount/src/streamlit_app/{modelname}_architecture.pth"
+    if not check_if_file_exists(local_model_arch_path):
         st.write(f"Downloading model architecture {modelname}...")
-        download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], local_model_path)
+        download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], local_model_arch_path)
     
     st.write(f"Using locally saved model architecture {modelname}.")
-    model = torch.load(local_model_path)
-
-    new_state_dict = {}
-    for key, value in pretrained['teacher'].items():
-        if 'dino_head' in key or "ibot_head" in key:
-            pass
-        else:
-            new_key = key.replace('backbone.', '')
-            new_state_dict[new_key] = value
-
-    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
-    model.pos_embed = pos_embed
-
-    model.load_state_dict(new_state_dict, strict=True)
+    
+    # Re-create the model architecture
+    model = torch.hub.load('facebookresearch/dinov2', modelname)
+    
+    # Load the saved state dict into the model
+    model.load_state_dict(pretrained)
     model = model.cpu()
     return model
 
@@ -130,8 +125,6 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
-
-
 
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
