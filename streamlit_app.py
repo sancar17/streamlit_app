@@ -133,19 +133,13 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    images_base64 = []
     hover_images = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((50, 50)).convert('RGB')
-        large_image = Image.open(image_path).resize((200, 200)).convert('RGB')  # Larger version for hover
+        large_image = Image.open(image_path).resize((200, 200)).convert('RGB')
         buffered = BytesIO()
-        large_buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        large_image.save(large_buffered, format="PNG")
+        large_image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
-        images_base64.append(f"data:image/png;base64,{img_str}")
-        hover_images.append(f"data:image/png;base64,{large_img_str}")
+        hover_images.append(f"data:image/png;base64,{img_str}")
 
     fig = go.Figure()
 
@@ -156,7 +150,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         marker=dict(size=8, opacity=0.7),
         text=[class_names[label] for label in labels],
         customdata=hover_images,
-        hoverinfo='none'
+        hovertemplate="<b>Class:</b> %{text}<br><img src='%{customdata}' width=200 height=200><extra></extra>"
     )
     fig.add_trace(scatter)
 
@@ -297,31 +291,6 @@ else:
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.error("Please select a model or upload a model file.")
-
-components.html(
-    """
-    <script>
-    const plotlyDiv = document.querySelector(".stPlotlyChart");
-    plotlyDiv.on('plotly_hover', function(data) {
-        const point = data.points[0];
-        const hoverImage = point.customdata;
-        const hoverBox = document.createElement("div");
-        hoverBox.style.position = "absolute";
-        hoverBox.style.left = point.xpx + 'px';
-        hoverBox.style.top = point.ypx + 'px';
-        hoverBox.style.background = 'white';
-        hoverBox.style.border = '1px solid black';
-        hoverBox.style.padding = '10px';
-        hoverBox.innerHTML = `<img src="${hoverImage}" style="width:200px;height:200px;">`;
-        document.body.appendChild(hoverBox);
-        plotlyDiv.on('plotly_unhover', function() {
-            hoverBox.remove();
-        });
-    });
-    </script>
-    """,
-    height=0,
-)
