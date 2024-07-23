@@ -16,7 +16,7 @@ from io import BytesIO
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs 
+# Google Drive URLs
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
@@ -43,11 +43,37 @@ model_options = {
 def download_from_gdrive(gdrive_url, download_path):
     gdown.download(gdrive_url, download_path, quiet=False)
 
+# Check if a file exists
+def check_if_file_exists(filepath):
+    return os.path.isfile(filepath)
+
+# Check if a directory exists
+def check_if_directory_exists(dirpath):
+    return os.path.isdir(dirpath)
+
+# Function to list files in a directory
+def list_files_in_directory(directory, file_extension=None):
+    try:
+        files = os.listdir(directory)
+        if file_extension:
+            files = [file for file in files if file.endswith(file_extension)]
+        return files
+    except FileNotFoundError:
+        return f"Directory {directory} not found."
+    except Exception as e:
+        return str(e)
+
+# Display files in the directories
+st.write("Files in /mount/src/streamlit_app:")
+st.write(list_files_in_directory("/mount/src/streamlit_app"))
+
+st.write("Files in /mount/src/streamlit_app/sample_data:")
+st.write(list_files_in_directory("/mount/src/streamlit_app/sample_data"))
+
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
     image_paths = []
     labels = []
-    # Adjusted to look for class folders under the nested data_samples folder
     nested_data_folder = os.path.join(data_folder, "data_sample")
     class_names = os.listdir(nested_data_folder)
     st.write(f"Class names found: {class_names}")
@@ -93,7 +119,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    # Prepare images for embedding in the plot
     images_base64 = []
     for image_path in image_paths:
         image = Image.open(image_path).resize((50, 50)).convert('RGB')
@@ -104,7 +129,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     fig = go.Figure()
 
-    # Add a scatter plot with invisible markers to serve as image anchors
     scatter = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
@@ -115,7 +139,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
     fig.add_trace(scatter)
 
-    # Add images at the scatter plot coordinates
     for img_str, (x, y) in zip(images_base64, umap_data):
         fig.add_layout_image(
             dict(
@@ -151,19 +174,15 @@ def upload_and_process_features(features_file, data_source, data_file):
     else:
         raise ValueError("Features file is required for this option.")
     
-    if data_source == "Sample Data":
-        data_path = "sample_data"
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
+    data_path = "sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
         download_path = os.path.join(data_path, "sample_data.zip")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
-    elif data_file is not None:
-        data_path = os.path.dirname(data_file.name)
     else:
-        raise ValueError("Data source is required for this option.")
+        st.write("Using data sample from the cloud.")
 
     _, labels, class_names, image_paths = load_images(data_path)
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
@@ -188,32 +207,25 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     return model
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
-    if model_source != "Upload Model":
-        model_key = model_source
-        st.write("Downloading model:", GDRIVE_URLS[model_key])
-        model_path = f"{model_key.replace(' ', '_')}.pth"
+    model_key = model_source
+    model_path = f"{model_key.replace(' ', '_')}.pth"
+    if not check_if_file_exists(model_path):
+        st.write(f"Downloading model {model_source}...")
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = get_dino_bloom(model_path, model_options[model_key])
-    elif model_file is not None:
-        model_path = model_file.name
-        model = get_dino_bloom(model_path, model_options[model_source])
     else:
-        raise ValueError("Model source is required for this option.")
+        st.write(f"Using model {model_source} from the cloud.")
+    
+    model = get_dino_bloom(model_path, model_options[model_key])
 
-    if data_source == "Sample Data":
-        data_path = "sample_data"
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
+    data_path = "sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
         download_path = os.path.join(data_path, "sample_data.zip")
-        st.write("Downloading data:", GDRIVE_URLS["sample_data"])
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
-    elif data_file is not None:
-        data_path = os.path.dirname(data_file.name)
     else:
-        raise ValueError("Data source is required for this option.")
+        st.write("Using data sample from the cloud.")
     
     images, labels, class_names, image_paths = load_images(data_path)
     images = images
