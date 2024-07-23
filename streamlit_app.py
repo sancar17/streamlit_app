@@ -23,10 +23,7 @@ GDRIVE_URLS = {
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "dinov2_vits14_architecture": "yok",
-    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
-    "dinov2_vitl14_architecture":"yok",
-    "dinov2_vitg14_architecture":"yok"
+    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP"
 }
 
 # Function to download file from Google Drive
@@ -52,7 +49,7 @@ def list_files_in_directory(directory, file_extension=None):
         return f"Directory {directory} not found."
     except Exception as e:
         return str(e)
-
+    
 # Display files in the directories
 st.write("Files in /mount/src/streamlit_app:")
 st.write(list_files_in_directory("/mount/src/streamlit_app"))
@@ -73,7 +70,6 @@ model_options = {
     "DinoBloom L": "dinov2_vitl14",
     "DinoBloom G": "dinov2_vitg14"
 }
-
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     # Check if the processed model exists locally
     if not check_if_file_exists(modelpath):
@@ -83,7 +79,7 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
     
     # Check if the model architecture exists locally
-    local_model_path = f"/mount/src/streamlit_app/{modelname}_architecture.pt"
+    local_model_path = f"/mount/src/streamlit_app/{modelname}_architecture.pth"
     if not check_if_file_exists(local_model_path):
         st.write(f"Downloading model architecture {modelname}...")
         download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], local_model_path)
