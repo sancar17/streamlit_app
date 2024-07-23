@@ -133,49 +133,38 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    hover_images = []
-    for image_path in image_paths:
-        image = Image.open(image_path).resize((50, 50)).convert('RGB')
-        large_image = Image.open(image_path).resize((200, 200)).convert('RGB')
-        buffered = BytesIO()
-        large_buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        large_image.save(large_buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
-        hover_images.append(f"data:image/png;base64,{large_img_str}")
-
     fig = go.Figure()
 
-    scatter = go.Scatter(
-        x=umap_data[:, 0],
-        y=umap_data[:, 1],
-        mode='markers',
-        marker=dict(size=8, opacity=0.7),
-        text=[class_names[label] for label in labels],
-        customdata=hover_images,
-        hovertemplate="<b>Class:</b> %{text}<br><img src='%{customdata}' width=200 height=200><extra></extra>"
-    )
-    fig.add_trace(scatter)
+    for (x, y), label, image_path in zip(umap_data, labels, image_paths):
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    for img_str, (x, y) in zip(hover_images, umap_data):
+        fig.add_trace(go.Scatter(
+            x=[x],
+            y=[y],
+            mode='markers',
+            marker=dict(size=10, opacity=0.7),
+            text=f"Class: {class_names[label]}",
+            hoverinfo='text',
+            showlegend=False
+        ))
+
         fig.add_layout_image(
             dict(
-                source=img_str,
+                source=f"data:image/png;base64,{img_str}",
                 xref="x",
                 yref="y",
                 x=x,
                 y=y,
-                sizex=0.3,
-                sizey=0.3,
+                sizex=0.1,
+                sizey=0.1,
                 xanchor="center",
                 yanchor="middle",
                 layer="above"
             )
         )
-
-    fig.update_xaxes(visible=True)
-    fig.update_yaxes(visible=True)
 
     fig.update_layout(
         title="UMAP Projection with Images",
@@ -183,9 +172,35 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         yaxis_title="UMAP 2",
         template="plotly_white",
         showlegend=False,
+        hovermode='closest'
     )
 
     return fig
+
+def create_hover_component():
+    components.html(
+        """
+        <div id="hover-image" style="position: fixed; display: none; z-index: 9999;"></div>
+        <script>
+        const plotlyDiv = document.querySelector('.js-plotly-plot');
+        const hoverDiv = document.getElementById('hover-image');
+
+        plotlyDiv.on('plotly_hover', function(data) {
+            const point = data.points[0];
+            const imagePath = point.fullData.customdata[point.pointIndex];
+            hoverDiv.innerHTML = `<img src="${imagePath}" width="200" height="200">`;
+            hoverDiv.style.display = 'block';
+            hoverDiv.style.left = (point.pageX + 10) + 'px';
+            hoverDiv.style.top = (point.pageY + 10) + 'px';
+        });
+
+        plotlyDiv.on('plotly_unhover', function() {
+            hoverDiv.style.display = 'none';
+        });
+        </script>
+        """,
+        height=0,
+    )
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
         features = np.load(features_file)
@@ -295,5 +310,6 @@ else:
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
             st.plotly_chart(fig, use_container_width=True)
+            create_hover_component()
         else:
             st.error("Please select a model or upload a model file.")
