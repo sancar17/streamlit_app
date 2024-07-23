@@ -20,9 +20,9 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
-    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
-    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
-    "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
+    "DinoBloom B": "https://drive.google.com/uc?id=1gho7OcsJlekf8Pu84blhVBFT0WoPDolc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1L1ahUiQuTlpP2LItYa4JRYJwDMUnFzal",
+    "DinoBloom G": "https://drive.google.com/uc?id=16VT6rCL4QY0sUkJ1UmPnLVkCQXD8Fdwi"
 }
 
 embed_sizes = {
@@ -41,6 +41,8 @@ model_options = {
 
 # Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
+    # Create directory if it does not exist
+    os.makedirs(os.path.dirname(download_path), exist_ok=True)
     gdown.download(gdrive_url, download_path, quiet=False)
 
 # Check if a file exists
