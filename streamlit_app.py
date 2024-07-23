@@ -222,6 +222,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     model_path = f"{model_key.replace(' ', '_')}.pth"
     if not check_if_file_exists(model_path):
         st.write(f"Downloading model {model_source}...")
+        st.write(f'Model Path: {model_path}')
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     else:
         st.write(f"Using model {model_source} from the cloud.")
