@@ -11,3 +11,4 @@ matplotlib
 bokeh
 dash
 dinov2
+facebookresearch.dinov2
