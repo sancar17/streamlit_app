@@ -16,33 +16,33 @@ from io import BytesIO
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs 
+# Google Drive URLs for final processed models
 GDRIVE_URLS = {
-    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
+    "DinoBloom S": "https://drive.google.com/uc?id=1iy3K1E-lhef6iE26ewzMYPG8mwknkMHa",
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
-    "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
+    "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
+    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH"
 }
 
-embed_sizes = {
-    "dinov2_vits14": 384,
-    "dinov2_vitb14": 768,
-    "dinov2_vitl14": 1024,
-    "dinov2_vitg14": 1536
-}
+# Function to download file from Google Drive
+def download_from_gdrive(gdrive_url, download_path):
+    gdown.download(gdrive_url, download_path, quiet=False)
 
-model_options = {
-    "DinoBloom S": "dinov2_vits14",
-    "DinoBloom B": "dinov2_vitb14",
-    "DinoBloom L": "dinov2_vitl14",
-    "DinoBloom G": "dinov2_vitg14"
-}
+# Check if a file exists
+def check_if_file_exists(filepath):
+    return os.path.isfile(filepath)
+
+# Check if a directory exists
+def check_if_directory_exists(dirpath):
+    return os.path.isdir(dirpath)
 
 # Function to list files in a directory
-def list_files_in_directory(directory):
+def list_files_in_directory(directory, file_extension=None):
     try:
         files = os.listdir(directory)
+        if file_extension:
+            files = [file for file in files if file.endswith(file_extension)]
         return files
     except FileNotFoundError:
         return f"Directory {directory} not found."
@@ -56,15 +56,10 @@ st.write(list_files_in_directory("/mount/src/streamlit_app"))
 st.write("Files in /mount/src/streamlit_app/sample_data:")
 st.write(list_files_in_directory("/mount/src/streamlit_app/sample_data"))
 
-# Function to download file from Google Drive
-def download_from_gdrive(gdrive_url, download_path):
-    gdown.download(gdrive_url, download_path, quiet=False)
-
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
     image_paths = []
     labels = []
-    # Adjusted to look for class folders under the nested data_samples folder
     nested_data_folder = os.path.join(data_folder, "data_sample")
     class_names = os.listdir(nested_data_folder)
     st.write(f"Class names found: {class_names}")
@@ -110,7 +105,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    # Prepare images for embedding in the plot
     images_base64 = []
     for image_path in image_paths:
         image = Image.open(image_path).resize((50, 50)).convert('RGB')
@@ -121,7 +115,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     fig = go.Figure()
 
-    # Add a scatter plot with invisible markers to serve as image anchors
     scatter = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
@@ -132,7 +125,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
     fig.add_trace(scatter)
 
-    # Add images at the scatter plot coordinates
     for img_str, (x, y) in zip(images_base64, umap_data):
         fig.add_layout_image(
             dict(
@@ -168,69 +160,34 @@ def upload_and_process_features(features_file, data_source, data_file):
     else:
         raise ValueError("Features file is required for this option.")
     
-    if data_source == "Sample Data":
-        data_path = "sample_data"
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
+    data_path = "/mount/src/streamlit_app/sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
         download_path = os.path.join(data_path, "sample_data.zip")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
-    elif data_file is not None:
-        data_path = os.path.dirname(data_file.name)
-    else:
-        raise ValueError("Data source is required for this option.")
-
+    
     _, labels, class_names, image_paths = load_images(data_path)
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
-def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
-    
-    new_state_dict = {}
-    for key, value in pretrained['teacher'].items():
-        if 'dino_head' in key or "ibot_head" in key:
-            pass
-        else:
-            new_key = key.replace('backbone.', '')
-            new_state_dict[new_key] = value
-
-    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
-    model.pos_embed = pos_embed
-
-    model.load_state_dict(new_state_dict, strict=True)
-    return model
-
-def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
-    if model_source != "Upload Model":
-        model_key = model_source
-        st.write("Downloading model:", GDRIVE_URLS[model_key])
-        model_path = f"{model_key.replace(' ', '_')}.pth"
+def upload_and_process_data_and_model(model_source, data_source, data_file):
+    model_key = model_source
+    model_path = f"/mount/src/streamlit_app/{model_key.replace(' ', '_')}-final.pth"
+    if not check_if_file_exists(model_path):
+        st.write("Downloading model...")
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        model = get_dino_bloom(model_path, model_options[model_key])
-    elif model_file is not None:
-        model_path = model_file.name
-        model = get_dino_bloom(model_path, model_options[model_source])
-    else:
-        raise ValueError("Model source is required for this option.")
+    
+    model = torch.load(model_path, map_location=torch.device('cpu'))
 
-    if data_source == "Sample Data":
-        data_path = "sample_data"
-        if not os.path.exists(data_path):
-            os.makedirs(data_path)
+    data_path = "/mount/src/streamlit_app/sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
         download_path = os.path.join(data_path, "sample_data.zip")
-        st.write("Downloading data:", GDRIVE_URLS["sample_data"])
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        # Unzip the downloaded file
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
-    elif data_file is not None:
-        data_path = os.path.dirname(data_file.name)
-    else:
-        raise ValueError("Data source is required for this option.")
     
     images, labels, class_names, image_paths = load_images(data_path)
     images = images
@@ -258,19 +215,12 @@ if option == "Use Features":
         else:
             st.error("Please upload a features file.")
 else:
-    model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
-    if model_source == "Upload Model":
-        model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
-    else:
-        model_file = None
+    model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
     if data_source == "Upload Data":
         data_file = st.file_uploader("Upload Data Folder (optional)")
     else:
         data_file = None
     if st.button("Visualize UMAP"):
-        if model_source != "Upload Model" or model_file is not None:
-            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
-        else:
-            st.error("Please select a model or upload a model file.")
+        fig = upload_and_process_data_and_model(model_source, data_source, data_file)
+        st.plotly_chart(fig)
