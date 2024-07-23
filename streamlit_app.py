@@ -40,7 +40,7 @@ model_options = {
 }
 
 def download_from_gdrive(gdrive_url, download_path):
-    if download_path:
+    if os.path.dirname(download_path):
         os.makedirs(os.path.dirname(download_path), exist_ok=True)
     gdown.download(gdrive_url, download_path, quiet=False)
 
