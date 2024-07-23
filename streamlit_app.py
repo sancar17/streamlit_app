@@ -135,11 +135,15 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     hover_images = []
     for image_path in image_paths:
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
         large_image = Image.open(image_path).resize((200, 200)).convert('RGB')
         buffered = BytesIO()
-        large_image.save(buffered, format="PNG")
+        large_buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        large_image.save(large_buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        hover_images.append(f"data:image/png;base64,{img_str}")
+        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
+        hover_images.append(f"data:image/png;base64,{large_img_str}")
 
     fig = go.Figure()
 
@@ -154,7 +158,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
     fig.add_trace(scatter)
 
-    for img_str, (x, y) in zip(images_base64, umap_data):
+    for img_str, (x, y) in zip(hover_images, umap_data):
         fig.add_layout_image(
             dict(
                 source=img_str,
@@ -182,7 +186,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
 
     return fig
-
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
         features = np.load(features_file)
