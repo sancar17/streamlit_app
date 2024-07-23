@@ -22,10 +22,10 @@ GDRIVE_URLS = {
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
-    "dinov2_vits14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vits14",
-    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=1E9TORPo6NJ2cJ8PT_PNSuLTHIUhePXsx",
-    "dinov2_vitl14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vitl14",
-    "dinov2_vitg14_architecture": "YOUR_ARCHITECTURE_URL_FOR_dinov2_vitg14",
+    "dinov2_vits14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vits14",
+    "dinov2_vitb14_state_dict": "https://drive.google.com/uc?id=1E9TORPo6NJ2cJ8PT_PNSuLTHIUhePXsx",
+    "dinov2_vitl14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vitl14",
+    "dinov2_vitg14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vitg14",
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH"
 }
 
@@ -52,7 +52,7 @@ def list_files_in_directory(directory, file_extension=None):
         return f"Directory {directory} not found."
     except Exception as e:
         return str(e)
-    
+
 # Display files in the directories
 st.write("Files in /mount/src/streamlit_app:")
 st.write(list_files_in_directory("/mount/src/streamlit_app"))
@@ -73,27 +73,36 @@ model_options = {
     "DinoBloom L": "dinov2_vitl14",
     "DinoBloom G": "dinov2_vitg14"
 }
+
+def load_model_architecture(modelname):
+    if modelname == "dinov2_vits14":
+        from facebookresearch.dinov2 import dinov2_vits14
+        return dinov2_vits14()
+    elif modelname == "dinov2_vitb14":
+        from facebookresearch.dinov2 import dinov2_vitb14
+        return dinov2_vitb14()
+    elif modelname == "dinov2_vitl14":
+        from facebookresearch.dinov2 import dinov2_vitl14
+        return dinov2_vitl14()
+    elif modelname == "dinov2_vitg14":
+        from facebookresearch.dinov2 import dinov2_vitg14
+        return dinov2_vitg14()
+    else:
+        raise ValueError(f"Unknown model name: {modelname}")
+
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     # Check if the processed model exists locally
     if not check_if_file_exists(modelpath):
-        st.write(f"Downloading model {modelname}...")
-        download_from_gdrive(GDRIVE_URLS[modelname], modelpath)
+        st.write(f"Downloading model state dict {modelname}...")
+        download_from_gdrive(GDRIVE_URLS[f"{modelname}_state_dict"], modelpath)
     
-    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
-    
-    # Check if the model architecture exists locally
-    local_model_arch_path = f"/mount/src/streamlit_app/{modelname}_architecture.pth"
-    if not check_if_file_exists(local_model_arch_path):
-        st.write(f"Downloading model architecture {modelname}...")
-        download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], local_model_arch_path)
-    
-    st.write(f"Using locally saved model architecture {modelname}.")
+    state_dict = torch.load(modelpath, map_location=torch.device('cpu'))
     
     # Re-create the model architecture
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
+    model = load_model_architecture(modelname)
     
     # Load the saved state dict into the model
-    model.load_state_dict(pretrained)
+    model.load_state_dict(state_dict)
     model = model.cpu()
     return model
 
@@ -101,10 +110,10 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     model_key = model_options[model_source]
     model_path = f"/mount/src/streamlit_app/{model_source.replace(' ', '_')}-final.pth"
     if not check_if_file_exists(model_path):
-        st.write(f"Downloading model {model_source}...")
-        download_from_gdrive(GDRIVE_URLS[model_source], model_path)
+        st.write(f"Downloading model state dict {model_source}...")
+        download_from_gdrive(GDRIVE_URLS[f"{model_key}_state_dict"], model_path)
     else:
-        st.write(f"Using model {model_source} from the cloud.")
+        st.write(f"Using model state dict {model_source} from the cloud.")
     
     model = get_dino_bloom(model_path, model_key)
 
