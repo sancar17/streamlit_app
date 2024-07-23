@@ -13,6 +13,9 @@ import zipfile
 import base64
 from io import BytesIO
 
+import streamlit.components.v1 as components
+import json
+
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -150,12 +153,10 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         x=umap_data[:, 0],
         y=umap_data[:, 1],
         mode='markers',
-        marker=dict(size=1, opacity=0),
+        marker=dict(size=8, opacity=0.7),
         text=[class_names[label] for label in labels],
-        hoverinfo='none',
-        hovertemplate='<b>%{text}</b><br>' +
-                      '<img src="%{customdata}" style="width:200px;height:200px;"><extra></extra>',
-        customdata=hover_images
+        customdata=hover_images,
+        hoverinfo='none'
     )
     fig.add_trace(scatter)
 
@@ -187,7 +188,6 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     )
 
     return fig
-
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -300,3 +300,28 @@ else:
             st.plotly_chart(fig)
         else:
             st.error("Please select a model or upload a model file.")
+
+components.html(
+    """
+    <script>
+    const plotlyDiv = document.querySelector(".stPlotlyChart");
+    plotlyDiv.on('plotly_hover', function(data) {
+        const point = data.points[0];
+        const hoverImage = point.customdata;
+        const hoverBox = document.createElement("div");
+        hoverBox.style.position = "absolute";
+        hoverBox.style.left = point.xpx + 'px';
+        hoverBox.style.top = point.ypx + 'px';
+        hoverBox.style.background = 'white';
+        hoverBox.style.border = '1px solid black';
+        hoverBox.style.padding = '10px';
+        hoverBox.innerHTML = `<img src="${hoverImage}" style="width:200px;height:200px;">`;
+        document.body.appendChild(hoverBox);
+        plotlyDiv.on('plotly_unhover', function() {
+            hoverBox.remove();
+        });
+    });
+    </script>
+    """,
+    height=0,
+)
