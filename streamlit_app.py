@@ -12,22 +12,25 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-import dinov2
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs for final processed models
+# Google Drive URLs for final processed models and state dicts
 GDRIVE_URLS = {
     "DinoBloom S": "https://drive.google.com/uc?id=1iy3K1E-lhef6iE26ewzMYPG8mwknkMHa",
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
-    "dinov2_vits14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vits14",
-    "dinov2_vitb14_state_dict": "https://drive.google.com/uc?id=1E9TORPo6NJ2cJ8PT_PNSuLTHIUhePXsx",
-    "dinov2_vitl14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vitl14",
-    "dinov2_vitg14_state_dict": "YOUR_state_dict_URL_FOR_dinov2_vitg14",
-    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH"
+    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
+    "dinov2_vits14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vits14",
+    "dinov2_vitb14_state_dict": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
+    "dinov2_vitl14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vitl14",
+    "dinov2_vitg14_state_dict": "YOUR_STATE_DICT_URL_FOR_dinov2_vitg14",
+    "dinov2_vits14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vits14",
+    "dinov2_vitb14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitb14",
+    "dinov2_vitl14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitl14",
+    "dinov2_vitg14_architecture": "YOUR_ARCHITECTURE_SCRIPT_URL_FOR_dinov2_vitg14"
 }
 
 # Function to download file from Google Drive
@@ -75,32 +78,32 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
-def load_model_architecture(modelname):
-    if modelname == "dinov2_vits14":
-        from dinov2 import dinov2_vits14
-        return dinov2_vits14()
-    elif modelname == "dinov2_vitb14":
-        from dinov2 import dinov2_vitb14
-        return dinov2_vitb14()
-    elif modelname == "dinov2_vitl14":
-        from dinov2 import dinov2_vitl14
-        return dinov2_vitl14()
-    elif modelname == "dinov2_vitg14":
-        from dinov2 import dinov2_vitg14
-        return dinov2_vitg14()
-    else:
-        raise ValueError(f"Unknown model name: {modelname}")
+def load_model_architecture(script_path):
+    with open(script_path, 'r') as f:
+        code = f.read()
+    exec(code, globals())
+    model_class_name = script_path.split('/')[-1].split('_')[0]
+    model_class = globals()[model_class_name]
+    return model_class()
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    # Check if the processed model exists locally
+    # Check if the processed model state dict exists locally
     if not check_if_file_exists(modelpath):
         st.write(f"Downloading model state dict {modelname}...")
         download_from_gdrive(GDRIVE_URLS[f"{modelname}_state_dict"], modelpath)
     
     state_dict = torch.load(modelpath, map_location=torch.device('cpu'))
     
+    # Check if the model architecture script exists locally
+    script_path = f"/mount/src/streamlit_app/{modelname}_architecture.py"
+    if not check_if_file_exists(script_path):
+        st.write(f"Downloading model architecture {modelname}...")
+        download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], script_path)
+    
+    st.write(f"Using locally saved model architecture {modelname}.")
+    
     # Re-create the model architecture
-    model = load_model_architecture(modelname)
+    model = load_model_architecture(script_path)
     
     # Load the saved state dict into the model
     model.load_state_dict(state_dict)
