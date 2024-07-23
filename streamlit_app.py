@@ -22,7 +22,11 @@ GDRIVE_URLS = {
     "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
-    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH"
+    "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
+    "dinov2_vits14": "yok",
+    "dinov2_vitb14": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
+    "dinov2_vitl14":"yok",
+    "dinov2_vitg14":"yok"
 }
 
 # Function to download file from Google Drive
@@ -55,6 +59,82 @@ st.write(list_files_in_directory("/mount/src/streamlit_app"))
 
 st.write("Files in /mount/src/streamlit_app/sample_data:")
 st.write(list_files_in_directory("/mount/src/streamlit_app/sample_data"))
+
+embed_sizes = {
+    "dinov2_vits14": 384,
+    "dinov2_vitb14": 768,
+    "dinov2_vitl14": 1024,
+    "dinov2_vitg14": 1536
+}
+
+model_options = {
+    "DinoBloom S": "dinov2_vits14",
+    "DinoBloom B": "dinov2_vitb14",
+    "DinoBloom L": "dinov2_vitl14",
+    "DinoBloom G": "dinov2_vitg14"
+}
+
+def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
+    if not check_if_file_exists(modelpath):
+        st.write(f"Downloading model {modelname}...")
+        download_from_gdrive(GDRIVE_URLS[modelname], modelpath)
+    
+    pretrained = torch.load(modelpath, map_location=torch.device('cuda:0'))
+    
+    # Load the model architecture locally
+    local_model_path = f"/mount/src/streamlit_app/{modelname}.pt"
+    if not check_if_file_exists(local_model_path):
+        st.write(f"Downloading model architecture {modelname}...")
+        model = torch.hub.load('facebookresearch/dinov2', modelname)
+        torch.save(model, local_model_path)
+    else:
+        st.write(f"Using locally saved model architecture {modelname}.")
+        model = torch.load(local_model_path)
+
+    new_state_dict = {}
+    for key, value in pretrained['teacher'].items():
+        if 'dino_head' in key or "ibot_head" in key:
+            pass
+        else:
+            new_key = key.replace('backbone.', '')
+            new_state_dict[new_key] = value
+
+    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
+    model.pos_embed = pos_embed
+
+    model.load_state_dict(new_state_dict, strict=True)
+    model = model.cuda()
+    return model
+
+def upload_and_process_data_and_model(model_source, data_source, data_file):
+    model_key = model_options[model_source]
+    model_path = f"/mount/src/streamlit_app/{model_source.replace(' ', '_')}-final.pth"
+    if not check_if_file_exists(model_path):
+        st.write(f"Downloading model {model_source}...")
+        download_from_gdrive(GDRIVE_URLS[model_source], model_path)
+    else:
+        st.write(f"Using model {model_source} from the cloud.")
+    
+    model = get_dino_bloom(model_path, model_key)
+
+    data_path = "/mount/src/streamlit_app/sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
+        download_path = os.path.join(data_path, "sample_data.zip")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
+        with zipfile.ZipFile(download_path, 'r') as zip_ref:
+            zip_ref.extractall(data_path)
+    else:
+        st.write("Using data sample from the cloud.")
+    
+    images, labels, class_names, image_paths = load_images(data_path)
+    
+    with torch.no_grad():
+        features = model(images).cpu().numpy()
+    
+    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return umap_fig
+
 
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
@@ -171,35 +251,6 @@ def upload_and_process_features(features_file, data_source, data_file):
         st.write("Using data sample from the cloud.")
 
     _, labels, class_names, image_paths = load_images(data_path)
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
-
-def upload_and_process_data_and_model(model_source, data_source, data_file):
-    model_key = model_source
-    model_path = f"/mount/src/streamlit_app/{model_key.replace(' ', '_')}-final.pth"
-    if not check_if_file_exists(model_path):
-        st.write("Downloading model...")
-        download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-    else:
-        st.write("Using model from the cloud.")
-    
-    model = torch.load(model_path, map_location=torch.device('cpu'))
-
-    data_path = "/mount/src/streamlit_app/sample_data"
-    if not check_if_directory_exists(data_path):
-        st.write("Downloading data sample...")
-        download_path = os.path.join(data_path, "sample_data.zip")
-        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        with zipfile.ZipFile(download_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
-    else:
-        st.write("Using data sample from the cloud.")
-    
-    images, labels, class_names, image_paths = load_images(data_path)
-    
-    with torch.no_grad():
-        features = model(images).cpu().numpy()
-    
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
