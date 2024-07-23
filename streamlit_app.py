@@ -167,7 +167,9 @@ def upload_and_process_features(features_file, data_source, data_file):
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
-    
+    else:
+        st.write("Using data sample from the cloud.")
+
     _, labels, class_names, image_paths = load_images(data_path)
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
@@ -178,6 +180,8 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     if not check_if_file_exists(model_path):
         st.write("Downloading model...")
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
+    else:
+        st.write("Using model from the cloud.")
     
     model = torch.load(model_path, map_location=torch.device('cpu'))
 
@@ -188,9 +192,10 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
             zip_ref.extractall(data_path)
+    else:
+        st.write("Using data sample from the cloud.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
