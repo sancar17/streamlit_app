@@ -16,12 +16,12 @@ from io import BytesIO
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs
+# Google Drive URLs 
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
-    "DinoBloom B": "https://drive.google.com/uc?id=1gho7OcsJlekf8Pu84blhVBFT0WoPDolc",
-    "DinoBloom L": "https://drive.google.com/uc?id=1L1ahUiQuTlpP2LItYa4JRYJwDMUnFzal",
+    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
 
@@ -62,6 +62,16 @@ def list_files_in_directory(directory, file_extension=None):
         return f"Directory {directory} not found."
     except Exception as e:
         return str(e)
+
+# Function to remove all .pt and .pth files in a directory
+def remove_pt_pth_files(directory):
+    removed_files = []
+    for file_name in os.listdir(directory):
+        if file_name.endswith('.pt') or file_name.endswith('.pth'):
+            file_path = os.path.join(directory, file_name)
+            os.remove(file_path)
+            removed_files.append(file_path)
+    return removed_files
 
 # Display files in the directories
 st.write("Files in /mount/src/streamlit_app:")
@@ -236,7 +246,15 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
 
+# Streamlit app
 st.title("UMAP Visualization with DinoBloom Features")
+
+# Button to remove predownloaded models
+if st.button("Remove predownloaded models"):
+    removed_files = remove_pt_pth_files("/mount/src/streamlit_app")
+    st.write("Removed files:")
+    st.write(removed_files)
+
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
 if option == "Use Features":
