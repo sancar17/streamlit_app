@@ -12,16 +12,16 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
+from streamlit_plotly_events import plotly_events
 
 import streamlit.components.v1 as components
 import json
-
 import streamlit as st
-from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, HoverTool
-from bokeh.palettes import Spectral10
-from bokeh.embed import json_item
-import json
+import plotly.express as px
+import plotly.graph_objects as go
+from PIL import Image
+import io
+import base64
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -140,37 +140,38 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    # Create a color map
-    unique_labels = list(set(labels))
-    color_map = {label: Spectral10[i % 10] for i, label in enumerate(unique_labels)}
-    colors = [color_map[label] for label in labels]
+    fig = px.scatter(x=umap_data[:, 0], y=umap_data[:, 1])
+    fig.update_traces(
+        hoverinfo="none",
+        hovertemplate=None,
+        marker=dict(size=10)
+    )
 
-    source = ColumnDataSource(data=dict(
+    # Add invisible scatter trace for hover functionality
+    hover_trace = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
-        label=[class_names[label] for label in labels],
-        color=colors,
-        image_url=image_paths
-    ))
+        mode='markers',
+        marker=dict(size=10, opacity=0),
+        hoverinfo='none',
+        showlegend=False,
+        customdata=list(zip(image_paths, [class_names[label] for label in labels]))
+    )
+    fig.add_trace(hover_trace)
 
-    p = figure(title="UMAP Projection with Images", width=800, height=600)
-    
-    p.scatter('x', 'y', size=10, color='color', alpha=0.6, source=source)
+    fig.update_layout(
+        title="UMAP Projection with Images",
+        hovermode="closest"
+    )
 
-    hover = HoverTool(tooltips="""
-        <div>
-            <div>
-                <img src="@image_url" style="width: 200px; height: 200px;"/>
-            </div>
-            <div>
-                <span style="font-size: 12px; color: #966;">@label</span>
-            </div>
-        </div>
-    """)
+    return fig
 
-    p.add_tools(hover)
-
-    return p
+def load_and_encode_image(image_path):
+    im = Image.open(image_path)
+    buffer = io.BytesIO()
+    im.save(buffer, format="PNG")
+    encoded_image = base64.b64encode(buffer.getvalue()).decode()
+    return f"data:image/png;base64,{encoded_image}"
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -277,9 +278,20 @@ else:
         data_file = st.file_uploader("Upload Data Folder (optional)")
     else:
         data_file = None
+    
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            bokeh_plot = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.bokeh_chart(bokeh_plot)
-        else:
-            st.error("Please select a model or upload a model file.")
+            features, labels, image_paths, class_names = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+
+            # Create a placeholder for the hover image
+            hover_image = st.empty()
+
+            # Use Streamlit's custom Plotly events
+            selected_point = plotly_events(fig, click_event=False, hover_event=True)
+
+            if selected_point:
+                point = selected_point[0]
+                image_path, label = fig.data[-1].customdata[point['pointIndex']]
+                encoded_image = load_and_encode_image(image_path)
+                hover_image.image(encoded_image, caption=f"Class: {label}", use_column_width=True)
