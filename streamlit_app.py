@@ -23,10 +23,10 @@ GDRIVE_URLS = {
     "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
     "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE",
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
-    "dinov2_vits14": "yok",
-    "dinov2_vitb14": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
-    "dinov2_vitl14":"yok",
-    "dinov2_vitg14":"yok"
+    "dinov2_vits14_architecture": "yok",
+    "dinov2_vitb14_architecture": "https://drive.google.com/uc?id=17kFb-PM9dqU-1_sB186OhXtblo8hLVmP",
+    "dinov2_vitl14_architecture":"yok",
+    "dinov2_vitg14_architecture":"yok"
 }
 
 # Function to download file from Google Drive
@@ -75,21 +75,21 @@ model_options = {
 }
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
+    # Check if the processed model exists locally
     if not check_if_file_exists(modelpath):
         st.write(f"Downloading model {modelname}...")
         download_from_gdrive(GDRIVE_URLS[modelname], modelpath)
     
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
     
-    # Load the model architecture locally
-    local_model_path = f"/mount/src/streamlit_app/{modelname}.pt"
+    # Check if the model architecture exists locally
+    local_model_path = f"/mount/src/streamlit_app/{modelname}_architecture.pt"
     if not check_if_file_exists(local_model_path):
         st.write(f"Downloading model architecture {modelname}...")
-        model = torch.hub.load('facebookresearch/dinov2', modelname)
-        torch.save(model, local_model_path)
-    else:
-        st.write(f"Using locally saved model architecture {modelname}.")
-        model = torch.load(local_model_path)
+        download_from_gdrive(GDRIVE_URLS[f"{modelname}_architecture"], local_model_path)
+    
+    st.write(f"Using locally saved model architecture {modelname}.")
+    model = torch.load(local_model_path)
 
     new_state_dict = {}
     for key, value in pretrained['teacher'].items():
@@ -134,6 +134,7 @@ def upload_and_process_data_and_model(model_source, data_source, data_file):
     
     umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
     return umap_fig
+
 
 
 def load_images(data_folder):
