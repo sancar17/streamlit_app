@@ -39,10 +39,9 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
-# Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
-    # Create directory if it does not exist
-    os.makedirs(os.path.dirname(download_path), exist_ok=True)
+    if download_path:
+        os.makedirs(os.path.dirname(download_path), exist_ok=True)
     gdown.download(gdrive_url, download_path, quiet=False)
 
 # Check if a file exists
@@ -232,6 +231,7 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     data_path = "sample_data"
     if not check_if_directory_exists(data_path):
         st.write("Downloading data sample...")
+        os.makedirs(data_path, exist_ok=True)  # Ensure the directory exists
         download_path = os.path.join(data_path, "sample_data.zip")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
