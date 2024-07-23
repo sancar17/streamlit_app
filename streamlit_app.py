@@ -79,7 +79,7 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
         st.write(f"Downloading model {modelname}...")
         download_from_gdrive(GDRIVE_URLS[modelname], modelpath)
     
-    pretrained = torch.load(modelpath, map_location=torch.device('cuda:0'))
+    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
     
     # Load the model architecture locally
     local_model_path = f"/mount/src/streamlit_app/{modelname}.pt"
@@ -103,7 +103,7 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     model.pos_embed = pos_embed
 
     model.load_state_dict(new_state_dict, strict=True)
-    model = model.cuda()
+    model = model.cpu()
     return model
 
 def upload_and_process_data_and_model(model_source, data_source, data_file):
