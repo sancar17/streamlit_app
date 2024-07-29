@@ -89,7 +89,6 @@ def load_images(data_folder):
                 if image_name.endswith('.bmp'):
                     image_paths.append(os.path.join(cls_folder, image_name))
                     labels.append(class_to_idx[cls_name])
-                    break  # Only take one image from each subfolder
     
     preprocess = transforms.Compose([
         transforms.Resize((224, 224)),
