@@ -12,20 +12,9 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
+from streamlit.components.v1 import html
 
 st.set_page_config(layout="wide")
-
-# Add custom CSS for hover effect
-st.markdown("""
-<style>
-    .plotly-graph-div .hoverlabel {
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-radius: 6px;
-        overflow: hidden;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -157,28 +146,14 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     fig = go.Figure()
 
-    for img, (x, y), label in zip(images_base64, umap_data, labels):
-        fig.add_layout_image(
-            dict(
-                source=img['small'],
-                xref="x",
-                yref="y",
-                x=x,
-                y=y,
-                sizex=0.3,
-                sizey=0.3,
-                xanchor="center",
-                yanchor="middle",
-                layer="above"
-            )
-        )
+    for idx, ((x, y), label) in enumerate(zip(umap_data, labels)):
         fig.add_trace(go.Scatter(
             x=[x],
             y=[y],
             mode='markers',
-            marker=dict(size=1, opacity=0),
-            hoverinfo='text',
-            text=f'<img src="{img["large"]}" width="200"><br>{class_names[label]}',
+            marker=dict(size=10, opacity=0.5),
+            hoverinfo='none',
+            customdata=[idx]
         ))
 
     fig.update_layout(
@@ -193,29 +168,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     fig.update_xaxes(showgrid=True)
     fig.update_yaxes(showgrid=True)
 
-    return fig
-
-
-
-def upload_and_process_features(features_file, data_source, data_file):
-    if features_file is not None:
-        features = np.load(features_file)
-    else:
-        raise ValueError("Features file is required for this option.")
-    
-    data_path = "sample_data"
-    if not check_if_directory_exists(data_path):
-        st.write("Downloading data sample...")
-        download_path = os.path.join(data_path, "sample_data.zip")
-        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        with zipfile.ZipFile(download_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
-    else:
-        st.write("Using data sample from the cloud.")
-
-    _, labels, class_names, image_paths = load_images(data_path)
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
+    return fig, images_base64, class_names
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
@@ -257,30 +210,18 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         st.write("Using data sample from the cloud.")
     
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return umap_fig
+    fig, images_base64, class_names = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return fig, images_base64, class_names
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features (Not Implemented)", "Use Model"])
 
 if option == "Use Features":
-    features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
-    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    if data_source == "Upload Data":
-        data_file = st.file_uploader("Upload Data Folder (optional)")
-    else:
-        data_file = None
-    if st.button("Visualize UMAP"):
-        if features_file is not None:
-            fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.error("Please upload a features file.")
+    st.write("Feature-based visualization is not implemented yet.")
 else:
     model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
     if model_source == "Upload Model":
@@ -294,7 +235,42 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            fig, images_base64, class_names = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            
+            # Display the plot
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Add custom tooltip
+            tooltip_html = f"""
+            <div id="tooltip" style="display: none; position: absolute; background: white; border: 1px solid black; padding: 5px; z-index: 1000;"></div>
+            <script>
+            const tooltip = document.getElementById('tooltip');
+            const plotlyElement = document.querySelector('.js-plotly-plot');
+            const images = {images_base64};
+            const classNames = {class_names};
+
+            plotlyElement.on('plotly_hover', function(data) {{
+                const point = data.points[0];
+                const idx = point.customdata[0];
+                
+                const xPos = point.xaxis.d2p(point.x) + point.xaxis._offset;
+                const yPos = point.yaxis.d2p(point.y) + point.yaxis._offset;
+                
+                tooltip.innerHTML = `
+                    <img src="${{images[idx].large}}" style="width:200px">
+                    <p>${{classNames[idx]}}</p>
+                `;
+                tooltip.style.left = (xPos + 10) + 'px';
+                tooltip.style.top = (yPos + 10) + 'px';
+                tooltip.style.display = 'block';
+            }});
+
+            plotlyElement.on('plotly_unhover', function(data) {{
+                tooltip.style.display = 'none';
+            }});
+            </script>
+            """
+            
+            html(tooltip_html, height=0)
         else:
             st.error("Please select a model or upload a model file.")
