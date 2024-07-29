@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html
+from dash import dcc, html, no_update
 from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 import torch
@@ -12,7 +12,6 @@ import umap
 import base64
 from io import BytesIO
 import zipfile
-
 
 # Initialize Dash app
 app = dash.Dash(__name__)
@@ -103,26 +102,7 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     model.load_state_dict(new_state_dict, strict=True)
     return model
 
-import dash
-from dash import dcc, html, no_update
-from dash.dependencies import Input, Output, State
-import plotly.graph_objs as go
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
-from PIL import Image
-import os
-import numpy as np
-import umap
-import base64
-from io import BytesIO
-import zipfile
 
-# Initialize Dash app
-app = dash.Dash(__name__)
-
-# Local paths and other constants remain the same
-# ...
 
 def create_umap_visualization(features, labels, image_paths, class_names):
     n_neighbors = min(15, len(features) - 1)
