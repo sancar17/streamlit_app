@@ -144,7 +144,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         marker=dict(size=5, opacity=0.7),
         text=[class_names[label] for label in labels],
         customdata=images_hover_base64,
-        hovertemplate="<b>%{text}</b><br><br><extra></extra>"
+        hovertemplate="<b>%{text}</b><br><img src='%{customdata}' style='width:150px;'><extra></extra>"
     )
     fig.add_trace(scatter)
 
@@ -216,13 +216,22 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     return model
 
 def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
-    model_key = model_source
-    model_path = f"{model_key.replace(' ', '_')}.pth"
-    if not check_if_file_exists(model_path):
-        st.write(f"Downloading model {model_source}...")
-        download_from_gdrive(GDRIVE_URLS[model_key], model_path)
+    if model_source == "Upload Model":
+        if model_file is not None:
+            model_path = model_file.name
+            with open(model_path, "wb") as f:
+                f.write(model_file.getbuffer())
+            model_key = "Uploaded Model"
+        else:
+            raise ValueError("Model file is required for this option.")
     else:
-        st.write(f"Using model {model_source} from the cloud.")
+        model_key = model_source
+        model_path = f"./{model_options[model_key]}.pth"
+        if not check_if_file_exists(model_path):
+            st.write(f"Downloading model {model_source}...")
+            download_from_gdrive(GDRIVE_URLS[model_key], model_path)
+        else:
+            st.write(f"Using model {model_source} from the cloud.")
     
     model = get_dino_bloom(model_path, model_options[model_key])
 
