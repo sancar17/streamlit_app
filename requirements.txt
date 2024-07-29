@@ -11,3 +11,4 @@ matplotlib
 dash
 dinov2
 streamlit-plotly-events
+bokeh
