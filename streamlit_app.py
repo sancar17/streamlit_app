@@ -152,7 +152,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         
         images_base64.append({
             'small': f"data:image/png;base64,{small_img_str}",
-            'large': large_img_str
+            'large': f"data:image/png;base64,{large_img_str}"
         })
 
     fig = go.Figure()
@@ -178,7 +178,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
             mode='markers',
             marker=dict(size=1, opacity=0),
             hoverinfo='text',
-            text=f'<br>{class_names[label]}',
+            text=f'<img src="data:image/png;base64,{img["large"]}" width="200"><br>{class_names[label]}',
             hoverlabel=dict(bgcolor="white", font_size=16),
         ))
 
