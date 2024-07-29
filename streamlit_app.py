@@ -178,7 +178,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
             mode='markers',
             marker=dict(size=1, opacity=0),
             hoverinfo='text',
-            text=f'<img src="data:image/png;base64,{img["large"]}" width="200"><br>{class_names[label]}',
+            text=f'<br>{class_names[label]}',
             hoverlabel=dict(bgcolor="white", font_size=16),
         ))
 
@@ -267,10 +267,9 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     return umap_fig
 
 st.title("UMAP Visualization with DinoBloom Features")
-option = st.radio("Choose an option", ["Use Features", "Use Model"])
+option = st.radio("Choose an option", ["Use Features (Not Implemented)", "Use Model"])
 
 if option == "Use Features":
-    st.write("This part not implemented yet")
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
     if data_source == "Upload Data":
