@@ -12,9 +12,6 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-from streamlit.components.v1 import html
-
-st.set_page_config(layout="wide")
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -124,32 +121,37 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path)
-        # Create small image for UMAP plot
-        small_image = image.copy()
-        small_image.thumbnail((50, 50))
-        small_buffered = BytesIO()
-        small_image.save(small_buffered, format="PNG")
-        small_img_str = base64.b64encode(small_buffered.getvalue()).decode()
-        
-        # Create larger image for tooltip
-        large_image = image.copy()
-        large_image.thumbnail((200, 200))
-        large_buffered = BytesIO()
-        large_image.save(large_buffered, format="PNG")
-        large_img_str = base64.b64encode(large_buffered.getvalue()).decode()
-        
-        images_base64.append({
-            'small': f"data:image/png;base64,{small_img_str}",
-            'large': f"data:image/png;base64,{large_img_str}"
-        })
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        images_base64.append(f"data:image/png;base64,{img_str}")
+
+    images_hover_base64 = []
+    for image_path in image_paths:
+        image = Image.open(image_path).resize((150, 150)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        images_hover_base64.append(f"data:image/png;base64,{img_str}")
 
     fig = go.Figure()
 
-    for img, (x, y), label in zip(images_base64, umap_data, labels):
+    scatter = go.Scatter(
+        x=umap_data[:, 0],
+        y=umap_data[:, 1],
+        mode='markers',
+        marker=dict(size=5, opacity=0.7),
+        text=[class_names[label] for label in labels],
+        customdata=images_hover_base64,
+        hovertemplate="<b>%{text}</b><br><br><extra></extra>"
+    )
+    fig.add_trace(scatter)
+
+    for img_str, (x, y) in zip(images_base64, umap_data):
         fig.add_layout_image(
             dict(
-                source=img['small'],
+                source=img_str,
                 xref="x",
                 yref="y",
                 x=x,
@@ -161,14 +163,9 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 layer="above"
             )
         )
-        fig.add_trace(go.Scatter(
-            x=[x],
-            y=[y],
-            mode='markers',
-            marker=dict(size=10, opacity=0.5),
-            hoverinfo='none',
-            customdata=[label]
-        ))
+
+    fig.update_xaxes(visible=True)
+    fig.update_yaxes(visible=True)
 
     fig.update_layout(
         title="UMAP Projection with Images",
@@ -176,13 +173,29 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         yaxis_title="UMAP 2",
         template="plotly_white",
         showlegend=False,
-        hovermode="closest"
     )
 
-    fig.update_xaxes(showgrid=True)
-    fig.update_yaxes(showgrid=True)
+    return fig
 
-    return fig, images_base64, class_names
+def upload_and_process_features(features_file, data_source, data_file):
+    if features_file is not None:
+        features = np.load(features_file)
+    else:
+        raise ValueError("Features file is required for this option.")
+    
+    data_path = "sample_data"
+    if not check_if_directory_exists(data_path):
+        st.write("Downloading data sample...")
+        download_path = os.path.join(data_path, "sample_data.zip")
+        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
+        with zipfile.ZipFile(download_path, 'r') as zip_ref:
+            zip_ref.extractall(data_path)
+    else:
+        st.write("Using data sample from the cloud.")
+
+    _, labels, class_names, image_paths = load_images(data_path)
+    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return umap_fig
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
@@ -224,18 +237,30 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
         st.write("Using data sample from the cloud.")
     
     images, labels, class_names, image_paths = load_images(data_path)
+    images = images
     
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
-    fig, images_base64, class_names = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return fig, images_base64, class_names
+    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return umap_fig
 
 st.title("UMAP Visualization with DinoBloom Features")
-option = st.radio("Choose an option", ["Use Features (Not Implemented)", "Use Model"])
+option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
 if option == "Use Features":
-    st.write("Feature-based visualization is not implemented yet.")
+    features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
+    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
+    if data_source == "Upload Data":
+        data_file = st.file_uploader("Upload Data Folder (optional)")
+    else:
+        data_file = None
+    if st.button("Visualize UMAP"):
+        if features_file is not None:
+            fig = upload_and_process_features(features_file, data_source, data_file)
+            st.plotly_chart(fig)
+        else:
+            st.error("Please upload a features file.")
 else:
     model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
     if model_source == "Upload Model":
@@ -249,42 +274,7 @@ else:
         data_file = None
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            fig, images_base64, class_names = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            
-            # Display the plot
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Add custom tooltip
-            tooltip_html = f"""
-            <div id="tooltip" style="display: none; position: absolute; background: white; border: 1px solid black; padding: 5px; z-index: 1000;"></div>
-            <script>
-            const tooltip = document.getElementById('tooltip');
-            const plotlyElement = document.querySelector('.js-plotly-plot');
-            const images = {images_base64};
-            const classNames = {class_names};
-
-            plotlyElement.on('plotly_hover', function(data) {{
-                const point = data.points[0];
-                const idx = point.pointNumber;
-                
-                const xPos = point.xaxis.d2p(point.x) + point.xaxis._offset;
-                const yPos = point.yaxis.d2p(point.y) + point.yaxis._offset;
-                
-                tooltip.innerHTML = `
-                    <img src="${{images[idx].large}}" style="width:200px">
-                    <p>${{classNames[point.customdata[0]]}}</p>
-                `;
-                tooltip.style.left = (xPos + 10) + 'px';
-                tooltip.style.top = (yPos + 10) + 'px';
-                tooltip.style.display = 'block';
-            }});
-
-            plotlyElement.on('plotly_unhover', function(data) {{
-                tooltip.style.display = 'none';
-            }});
-            </script>
-            """
-            
-            html(tooltip_html, height=0)
+            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.plotly_chart(fig)
         else:
             st.error("Please select a model or upload a model file.")
