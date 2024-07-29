@@ -146,14 +146,29 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     fig = go.Figure()
 
-    for idx, ((x, y), label) in enumerate(zip(umap_data, labels)):
+    for img, (x, y), label in zip(images_base64, umap_data, labels):
+        fig.add_layout_image(
+            dict(
+                source=img['small'],
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.3,
+                sizey=0.3,
+                xanchor="center",
+                yanchor="middle",
+                layer="above"
+            )
+        )
         fig.add_trace(go.Scatter(
             x=[x],
             y=[y],
             mode='markers',
-            marker=dict(size=10, opacity=0.5),
-            hoverinfo='none',
-            customdata=[idx]
+            marker=dict(size=1, opacity=0),
+            hoverinfo='text',
+            text=f'<img src="{img["large"]}" width="200"><br>{class_names[label]}',
+            customdata=[label]
         ))
 
     fig.update_layout(
@@ -251,14 +266,14 @@ else:
 
             plotlyElement.on('plotly_hover', function(data) {{
                 const point = data.points[0];
-                const idx = point.customdata[0];
+                const idx = point.pointNumber;
                 
                 const xPos = point.xaxis.d2p(point.x) + point.xaxis._offset;
                 const yPos = point.yaxis.d2p(point.y) + point.yaxis._offset;
                 
                 tooltip.innerHTML = `
                     <img src="${{images[idx].large}}" style="width:200px">
-                    <p>${{classNames[idx]}}</p>
+                    <p>${{classNames[point.customdata]}}</p>
                 `;
                 tooltip.style.left = (xPos + 10) + 'px';
                 tooltip.style.top = (yPos + 10) + 'px';
