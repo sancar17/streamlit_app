@@ -178,8 +178,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
             mode='markers',
             marker=dict(size=1, opacity=0),
             hoverinfo='text',
-            text=f'<img src="data:image/png;base64,{img["large"]}" width="200"><br>{class_names[label]}',
-            hoverlabel=dict(bgcolor="white", font_size=16),
+            text=f'<img src="{img["large"]}" width="200"><br>{class_names[label]}',
         ))
 
     fig.update_layout(
