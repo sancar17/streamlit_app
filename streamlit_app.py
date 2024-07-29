@@ -145,14 +145,14 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         
         # Create larger image for hover effect
         large_image = image.copy()
-        large_image.thumbnail((300, 300))
+        large_image.thumbnail((200, 200))
         large_buffered = BytesIO()
         large_image.save(large_buffered, format="PNG")
         large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
         
         images_base64.append({
             'small': f"data:image/png;base64,{small_img_str}",
-            'large': f"data:image/png;base64,{large_img_str}"
+            'large': large_img_str
         })
 
     fig = go.Figure()
@@ -178,7 +178,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
             mode='markers',
             marker=dict(size=1, opacity=0),
             hoverinfo='text',
-            text=f"<img src='{img['large']}' style='width:300px;'><br>{class_names[label]}",
+            text=f'<img src="data:image/png;base64,{img["large"]}" width="200"><br>{class_names[label]}',
             hoverlabel=dict(bgcolor="white", font_size=16),
         ))
 
@@ -191,7 +191,24 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         hovermode="closest"
     )
 
+    fig.update_xaxes(showgrid=True)
+    fig.update_yaxes(showgrid=True)
+
     return fig
+
+# Add this at the beginning of your Streamlit app
+st.set_page_config(layout="wide")
+
+# Add custom CSS for hover effect
+st.markdown("""
+<style>
+    .plotly-graph-div .hoverlabel {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 def upload_and_process_features(features_file, data_source, data_file):
@@ -276,7 +293,7 @@ if option == "Use Features":
     if st.button("Visualize UMAP"):
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.error("Please upload a features file.")
 else:
@@ -293,6 +310,6 @@ else:
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.error("Please select a model or upload a model file.")
