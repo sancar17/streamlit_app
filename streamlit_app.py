@@ -15,22 +15,7 @@ from io import BytesIO
 
 st.set_page_config(layout="wide")
 
-
-# Add this at the beginning of your Streamlit app
-st.set_page_config(layout="wide")
-
 # Add custom CSS for hover effect
-st.markdown("""
-<style>
-    .plotly-graph-div .hoverlabel {
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-radius: 6px;
-        overflow: hidden;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# custom CSS for hover effect
 st.markdown("""
 <style>
     .plotly-graph-div .hoverlabel {
