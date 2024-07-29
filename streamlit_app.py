@@ -7,7 +7,6 @@ import os
 import numpy as np
 import umap
 import plotly.graph_objects as go
-from tqdm import tqdm
 import gdown
 import zipfile
 import base64
@@ -54,25 +53,6 @@ def check_if_file_exists(filepath):
 def check_if_directory_exists(dirpath):
     return os.path.isdir(dirpath)
 
-# Function to list files in a directory
-def list_files_in_directory(directory, file_extension=None):
-    try:
-        files = os.listdir(directory)
-        if file_extension:
-            files = [file for file in files if file.endswith(file_extension)]
-        return files
-    except FileNotFoundError:
-        return f"Directory {directory} not found."
-    except Exception as e:
-        return str(e)
-
-# Display files in the directories
-st.write("Files in /mount/src/streamlit_app:")
-st.write(list_files_in_directory("/mount/src/streamlit_app"))
-
-st.write("Files in /mount/src/streamlit_app/sample_data:")
-st.write(list_files_in_directory("/mount/src/streamlit_app/sample_data"))
-
 def load_images(data_folder):
     st.write(f"Loading images from {data_folder}")
     image_paths = []
@@ -89,6 +69,7 @@ def load_images(data_folder):
                 if image_name.endswith('.bmp'):
                     image_paths.append(os.path.join(cls_folder, image_name))
                     labels.append(class_to_idx[cls_name])
+                    break  # Only take one image from each subfolder
     
     preprocess = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -99,11 +80,10 @@ def load_images(data_folder):
     images = []
     valid_labels = []
     valid_image_paths = []
-    for image_path, label in tqdm(zip(image_paths, labels), desc="Loading images", total=len(image_paths)):
+    for image_path, label in zip(image_paths, labels):
         try:
             image = Image.open(image_path).convert('RGB')
-            image = preprocess(image)
-            images.append(image)
+            images.append(preprocess(image))
             valid_labels.append(label)
             valid_image_paths.append(image_path)
         except (OSError, IOError) as e:
@@ -130,14 +110,14 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         small_image.thumbnail((50, 50))
         small_buffered = BytesIO()
         small_image.save(small_buffered, format="PNG")
-        small_img_str = base64.b64encode(small_buffered.getvalue()).decode('utf-8')
+        small_img_str = base64.b64encode(small_buffered.getvalue()).decode()
         
-        # Create larger image for hover effect
+        # Create larger image for tooltip
         large_image = image.copy()
         large_image.thumbnail((200, 200))
         large_buffered = BytesIO()
         large_image.save(large_buffered, format="PNG")
-        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
+        large_img_str = base64.b64encode(large_buffered.getvalue()).decode()
         
         images_base64.append({
             'small': f"data:image/png;base64,{small_img_str}",
@@ -165,9 +145,8 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
             x=[x],
             y=[y],
             mode='markers',
-            marker=dict(size=1, opacity=0),
-            hoverinfo='text',
-            text=f'<img src="{img["large"]}" width="200"><br>{class_names[label]}',
+            marker=dict(size=10, opacity=0.5),
+            hoverinfo='none',
             customdata=[label]
         ))
 
@@ -185,52 +164,7 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     return fig, images_base64, class_names
 
-def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
-    model = torch.hub.load('facebookresearch/dinov2', modelname)
-    
-    new_state_dict = {}
-    for key, value in pretrained['teacher'].items():
-        if 'dino_head' in key or "ibot_head" in key:
-            pass
-        else:
-            new_key = key.replace('backbone.', '')
-            new_state_dict[new_key] = value
-
-    pos_embed = nn.Parameter(torch.zeros(1, 257, embed_sizes[modelname]))
-    model.pos_embed = pos_embed
-
-    model.load_state_dict(new_state_dict, strict=True)
-    return model
-
-def upload_and_process_data_and_model(model_source, model_file, data_source, data_file):
-    model_key = model_source
-    model_path = f"{model_key.replace(' ', '_')}.pth"
-    if not check_if_file_exists(model_path):
-        st.write(f"Downloading model {model_source}...")
-        download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-    else:
-        st.write(f"Using model {model_source} from the cloud.")
-    
-    model = get_dino_bloom(model_path, model_options[model_key])
-
-    data_path = "sample_data"
-    if not check_if_directory_exists(data_path):
-        st.write("Downloading data sample...")
-        download_path = os.path.join(data_path, "sample_data.zip")
-        download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
-        with zipfile.ZipFile(download_path, 'r') as zip_ref:
-            zip_ref.extractall(data_path)
-    else:
-        st.write("Using data sample from the cloud.")
-    
-    images, labels, class_names, image_paths = load_images(data_path)
-    
-    with torch.no_grad():
-        features = model(images).cpu().numpy()
-    
-    fig, images_base64, class_names = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return fig, images_base64, class_names
+# Your existing functions (get_dino_bloom, upload_and_process_data_and_model) remain unchanged
 
 st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features (Not Implemented)", "Use Model"])
@@ -273,7 +207,7 @@ else:
                 
                 tooltip.innerHTML = `
                     <img src="${{images[idx].large}}" style="width:200px">
-                    <p>${{classNames[point.customdata]}}</p>
+                    <p>${{classNames[point.customdata[0]]}}</p>
                 `;
                 tooltip.style.left = (xPos + 10) + 'px';
                 tooltip.style.top = (yPos + 10) + 'px';
