@@ -13,6 +13,20 @@ import zipfile
 import base64
 from io import BytesIO
 
+st.set_page_config(layout="wide")
+
+# custom CSS for hover effect
+st.markdown("""
+<style>
+    .plotly-graph-div .hoverlabel {
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -121,28 +135,32 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
 
     images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((50, 50)).convert('RGB')
-        buffered = BytesIO()
-        image.save(buffered, format="PNG")
-        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        images_base64.append(f"data:image/png;base64,{img_str}")
+        image = Image.open(image_path)
+        # Create small image for UMAP plot
+        small_image = image.copy()
+        small_image.thumbnail((50, 50))
+        small_buffered = BytesIO()
+        small_image.save(small_buffered, format="PNG")
+        small_img_str = base64.b64encode(small_buffered.getvalue()).decode('utf-8')
+        
+        # Create larger image for hover effect
+        large_image = image.copy()
+        large_image.thumbnail((300, 300))
+        large_buffered = BytesIO()
+        large_image.save(large_buffered, format="PNG")
+        large_img_str = base64.b64encode(large_buffered.getvalue()).decode('utf-8')
+        
+        images_base64.append({
+            'small': f"data:image/png;base64,{small_img_str}",
+            'large': f"data:image/png;base64,{large_img_str}"
+        })
 
     fig = go.Figure()
 
-    scatter = go.Scatter(
-        x=umap_data[:, 0],
-        y=umap_data[:, 1],
-        mode='markers',
-        marker=dict(size=1, opacity=0),
-        text=[class_names[label] for label in labels],
-        hoverinfo='text'
-    )
-    fig.add_trace(scatter)
-
-    for img_str, (x, y) in zip(images_base64, umap_data):
+    for img, (x, y), label in zip(images_base64, umap_data, labels):
         fig.add_layout_image(
             dict(
-                source=img_str,
+                source=img['small'],
                 xref="x",
                 yref="y",
                 x=x,
@@ -154,9 +172,15 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
                 layer="above"
             )
         )
-
-    fig.update_xaxes(visible=True)
-    fig.update_yaxes(visible=True)
+        fig.add_trace(go.Scatter(
+            x=[x],
+            y=[y],
+            mode='markers',
+            marker=dict(size=1, opacity=0),
+            hoverinfo='text',
+            text=f"<img src='{img['large']}' style='width:300px;'><br>{class_names[label]}",
+            hoverlabel=dict(bgcolor="white", font_size=16),
+        ))
 
     fig.update_layout(
         title="UMAP Projection with Images",
@@ -164,9 +188,11 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         yaxis_title="UMAP 2",
         template="plotly_white",
         showlegend=False,
+        hovermode="closest"
     )
 
     return fig
+
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -240,6 +266,7 @@ st.title("UMAP Visualization with DinoBloom Features")
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
 if option == "Use Features":
+    st.write("This part not implemented yet")
     features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
     data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
     if data_source == "Upload Data":
@@ -249,7 +276,7 @@ if option == "Use Features":
     if st.button("Visualize UMAP"):
         if features_file is not None:
             fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig)
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.error("Please upload a features file.")
 else:
@@ -266,6 +293,6 @@ else:
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
             fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
+            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
         else:
             st.error("Please select a model or upload a model file.")
