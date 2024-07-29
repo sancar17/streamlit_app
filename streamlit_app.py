@@ -12,27 +12,17 @@ import gdown
 import zipfile
 import base64
 from io import BytesIO
-from streamlit_plotly_events import plotly_events
-
-import streamlit.components.v1 as components
-import json
-import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
-from PIL import Image
-import io
-import base64
 
 # Enable loading of truncated images
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# Google Drive URLs 
+# Google Drive URLs
 GDRIVE_URLS = {
     "sample_data": "https://drive.google.com/uc?id=1c-OBD9x_RT_VX0GZUbmOeEIFgpEdNNRH",
     "DinoBloom S": "https://drive.google.com/uc?id=1gedjQGhf4FiYpF1tP40ugMaYc0t6GhZZ",
-    "DinoBloom B": "https://drive.google.com/uc?id=1gho7OcsJlekf8Pu84blhVBFT0WoPDolc",
-    "DinoBloom L": "https://drive.google.com/uc?id=1L1ahUiQuTlpP2LItYa4JRYJwDMUnFzal",
-    "DinoBloom G": "https://drive.google.com/uc?id=16VT6rCL4QY0sUkJ1UmPnLVkCQXD8Fdwi"
+    "DinoBloom B": "https://drive.google.com/uc?id=1vs1DDpl3O93C_AwLLjaYSiKAI-N_Uitc",
+    "DinoBloom L": "https://drive.google.com/uc?id=1eXGCZzDez85ip4LEX1VIHe4TBmpuXaHY",
+    "DinoBloom G": "https://drive.google.com/uc?id=1-C-ip2qrKsp4eYBebw3ItWuu63crUitE"
 }
 
 embed_sizes = {
@@ -49,9 +39,8 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
+# Function to download file from Google Drive
 def download_from_gdrive(gdrive_url, download_path):
-    if os.path.dirname(download_path):
-        os.makedirs(os.path.dirname(download_path), exist_ok=True)
     gdown.download(gdrive_url, download_path, quiet=False)
 
 # Check if a file exists
@@ -73,16 +62,6 @@ def list_files_in_directory(directory, file_extension=None):
         return f"Directory {directory} not found."
     except Exception as e:
         return str(e)
-
-# Function to remove all .pt and .pth files in a directory
-def remove_pt_pth_files(directory):
-    removed_files = []
-    for file_name in os.listdir(directory):
-        if file_name.endswith('.pt') or file_name.endswith('.pth'):
-            file_path = os.path.join(directory, file_name)
-            os.remove(file_path)
-            removed_files.append(file_path)
-    return removed_files
 
 # Display files in the directories
 st.write("Files in /mount/src/streamlit_app:")
@@ -140,38 +119,54 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
     reducer = umap.UMAP()
     umap_data = reducer.fit_transform(data)
 
-    fig = px.scatter(x=umap_data[:, 0], y=umap_data[:, 1])
-    fig.update_traces(
-        hoverinfo="none",
-        hovertemplate=None,
-        marker=dict(size=10)
-    )
+    images_base64 = []
+    for image_path in image_paths:
+        image = Image.open(image_path).resize((50, 50)).convert('RGB')
+        buffered = BytesIO()
+        image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        images_base64.append(f"data:image/png;base64,{img_str}")
 
-    # Add invisible scatter trace for hover functionality
-    hover_trace = go.Scatter(
+    fig = go.Figure()
+
+    scatter = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
         mode='markers',
-        marker=dict(size=10, opacity=0),
-        hoverinfo='none',
-        showlegend=False,
-        customdata=list(zip(image_paths, [class_names[label] for label in labels]))
+        marker=dict(size=1, opacity=0),
+        text=[class_names[label] for label in labels],
+        hoverinfo='text'
     )
-    fig.add_trace(hover_trace)
+    fig.add_trace(scatter)
+
+    for img_str, (x, y) in zip(images_base64, umap_data):
+        fig.add_layout_image(
+            dict(
+                source=img_str,
+                xref="x",
+                yref="y",
+                x=x,
+                y=y,
+                sizex=0.3,
+                sizey=0.3,
+                xanchor="center",
+                yanchor="middle",
+                layer="above"
+            )
+        )
+
+    fig.update_xaxes(visible=True)
+    fig.update_yaxes(visible=True)
 
     fig.update_layout(
         title="UMAP Projection with Images",
-        hovermode="closest"
+        xaxis_title="UMAP 1",
+        yaxis_title="UMAP 2",
+        template="plotly_white",
+        showlegend=False,
     )
 
     return fig
-
-def load_and_encode_image(image_path):
-    im = Image.open(image_path)
-    buffer = io.BytesIO()
-    im.save(buffer, format="PNG")
-    encoded_image = base64.b64encode(buffer.getvalue()).decode()
-    return f"data:image/png;base64,{encoded_image}"
 
 def upload_and_process_features(features_file, data_source, data_file):
     if features_file is not None:
@@ -216,7 +211,6 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     model_path = f"{model_key.replace(' ', '_')}.pth"
     if not check_if_file_exists(model_path):
         st.write(f"Downloading model {model_source}...")
-        st.write(f'Model Path: {model_path}')
         download_from_gdrive(GDRIVE_URLS[model_key], model_path)
     else:
         st.write(f"Using model {model_source} from the cloud.")
@@ -226,7 +220,6 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     data_path = "sample_data"
     if not check_if_directory_exists(data_path):
         st.write("Downloading data sample...")
-        os.makedirs(data_path, exist_ok=True)  # Ensure the directory exists
         download_path = os.path.join(data_path, "sample_data.zip")
         download_from_gdrive(GDRIVE_URLS["sample_data"], download_path)
         with zipfile.ZipFile(download_path, 'r') as zip_ref:
@@ -240,18 +233,10 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     with torch.no_grad():
         features = model(images).cpu().numpy()
     
-    bokeh_plot = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-    return bokeh_plot
+    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    return umap_fig
 
-# Streamlit app
 st.title("UMAP Visualization with DinoBloom Features")
-
-# Button to remove predownloaded models
-if st.button("Remove predownloaded models"):
-    removed_files = remove_pt_pth_files("/mount/src/streamlit_app")
-    st.write("Removed files:")
-    st.write(removed_files)
-
 option = st.radio("Choose an option", ["Use Features", "Use Model"])
 
 if option == "Use Features":
@@ -278,20 +263,9 @@ else:
         data_file = st.file_uploader("Upload Data Folder (optional)")
     else:
         data_file = None
-    
     if st.button("Visualize UMAP"):
         if model_source != "Upload Model" or model_file is not None:
-            features, labels, image_paths, class_names = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
-
-            # Create a placeholder for the hover image
-            hover_image = st.empty()
-
-            # Use Streamlit's custom Plotly events
-            selected_point = plotly_events(fig, click_event=False, hover_event=True)
-
-            if selected_point:
-                point = selected_point[0]
-                image_path, label = fig.data[-1].customdata[point['pointIndex']]
-                encoded_image = load_and_encode_image(image_path)
-                hover_image.image(encoded_image, caption=f"Class: {label}", use_column_width=True)
+            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.plotly_chart(fig)
+        else:
+            st.error("Please select a model or upload a model file.")
