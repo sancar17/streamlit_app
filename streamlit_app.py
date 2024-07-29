@@ -127,13 +127,13 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
         images_base64.append(f"data:image/png;base64,{img_str}")
 
-    images_hover_base64 = []
+    large_images_base64 = []
     for image_path in image_paths:
-        image = Image.open(image_path).resize((150, 150)).convert('RGB')
+        image = Image.open(image_path).resize((200, 200)).convert('RGB')
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        images_hover_base64.append(f"data:image/png;base64,{img_str}")
+        large_images_base64.append(f"data:image/png;base64,{img_str}")
 
     fig = go.Figure()
 
@@ -141,10 +141,9 @@ def create_interactive_umap_with_images(data, labels, image_paths, class_names):
         x=umap_data[:, 0],
         y=umap_data[:, 1],
         mode='markers',
-        marker=dict(size=5, opacity=0.7),
-        text=[class_names[label] for label in labels],
-        customdata=images_hover_base64,
-        hovertemplate="<b>%{text}</b><br><img src='%{customdata}' style='width:150px;'><extra></extra>"
+        marker=dict(size=1, opacity=0),
+        text=[f'<b>{class_names[label]}</b><br><img src="{large_img_str}">' for label, large_img_str in zip(labels, large_images_base64)],
+        hoverinfo='text'
     )
     fig.add_trace(scatter)
 
@@ -226,15 +225,11 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
             raise ValueError("Model file is required for this option.")
     else:
         model_key = model_source
-        model_path = f"./{model_options[model_key]}.pth"
+        model_path = f"./{model_source.replace(' ', '_')}.pth"
         if not check_if_file_exists(model_path):
-            st.write(f"Downloading model {model_source}...")
-            download_from_gdrive(GDRIVE_URLS[model_key], model_path)
-        else:
-            st.write(f"Using model {model_source} from the cloud.")
+            st.write(f"Downloading {model_source} model...")
+            download_from_gdrive(GDRIVE_URLS[model_source], model_path)
     
-    model = get_dino_bloom(model_path, model_options[model_key])
-
     data_path = "sample_data"
     if not check_if_directory_exists(data_path):
         st.write("Downloading data sample...")
@@ -245,45 +240,45 @@ def upload_and_process_data_and_model(model_source, model_file, data_source, dat
     else:
         st.write("Using data sample from the cloud.")
     
+    model = get_dino_bloom(model_path, model_options[model_key])
     images, labels, class_names, image_paths = load_images(data_path)
-    images = images
     
     with torch.no_grad():
-        features = model(images).cpu().numpy()
+        feats = model(images).cpu().numpy()
     
-    umap_fig = create_interactive_umap_with_images(features, labels, image_paths, class_names)
+    umap_fig = create_interactive_umap_with_images(feats, labels, image_paths, class_names)
     return umap_fig
 
-st.title("UMAP Visualization with DinoBloom Features")
-option = st.radio("Choose an option", ["Use Features", "Use Model"])
+def app():
+    st.title("DINOv2 Model Embeddings")
 
-if option == "Use Features":
-    features_file = st.file_uploader("Upload Features File (required)", type=["npy"])
-    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    if data_source == "Upload Data":
-        data_file = st.file_uploader("Upload Data Folder (optional)")
-    else:
+    mode = st.radio("Choose mode", ["Upload Features", "Upload Model and Data"])
+
+    if mode == "Upload Features":
+        features_file = st.file_uploader("Upload features file (npz)")
+        data_source = st.radio("Choose data source", ["Use sample data", "Upload data"])
         data_file = None
-    if st.button("Visualize UMAP"):
-        if features_file is not None:
-            fig = upload_and_process_features(features_file, data_source, data_file)
-            st.plotly_chart(fig)
-        else:
-            st.error("Please upload a features file.")
-else:
-    model_source = st.selectbox("Choose Model", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
-    if model_source == "Upload Model":
-        model_file = st.file_uploader("Upload Model File (optional)", type=["pth"])
+        if data_source == "Upload data":
+            data_file = st.file_uploader("Upload data file (zip)")
+        
+        if st.button("Process Features"):
+            umap_fig = upload_and_process_features(features_file, data_source, data_file)
+            st.plotly_chart(umap_fig, use_container_width=True)
+    
     else:
+        model_source = st.radio("Choose model source", ["DinoBloom S", "DinoBloom B", "DinoBloom L", "DinoBloom G", "Upload Model"])
         model_file = None
-    data_source = st.selectbox("Choose Data Source", ["Sample Data", "Upload Data"])
-    if data_source == "Upload Data":
-        data_file = st.file_uploader("Upload Data Folder (optional)")
-    else:
+        if model_source == "Upload Model":
+            model_file = st.file_uploader("Upload model file (pth)")
+        
+        data_source = st.radio("Choose data source", ["Use sample data", "Upload data"])
         data_file = None
-    if st.button("Visualize UMAP"):
-        if model_source != "Upload Model" or model_file is not None:
-            fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
-            st.plotly_chart(fig)
-        else:
-            st.error("Please select a model or upload a model file.")
+        if data_source == "Upload data":
+            data_file = st.file_uploader("Upload data file (zip)")
+        
+        if st.button("Process Data and Model"):
+            umap_fig = upload_and_process_data_and_model(model_source, model_file, data_source, data_file)
+            st.plotly_chart(umap_fig, use_container_width=True)
+
+if __name__ == "__main__":
+    app()
