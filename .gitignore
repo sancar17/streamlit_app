@@ -16,3 +16,4 @@ secrets.txt
 yedek.py
 *.pth
 sample_data
+sample_data/data_sample_small/data_sample
