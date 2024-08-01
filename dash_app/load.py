@@ -1,9 +1,11 @@
-import torch
-import torch.nn as nn
-import torchvision.transforms as transforms
+import zipfile
 from PIL import Image
-import os
+from torchvision import transforms
+import torch
 import numpy as np
+import os
+import io
+import torch.nn as nn
 
 LOCAL_PATHS = {
     "sample_data": "/home/ubuntu/data_sample_small.zip",
@@ -27,42 +29,47 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
-def load_images(data_folder):
-    image_paths = []
-    labels = []
-    nested_data_folder = os.path.join(data_folder, "data_sample")
-    class_names = os.listdir(nested_data_folder)
-    class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
-    
-    for cls_name in class_names:
-        cls_folder = os.path.join(nested_data_folder, cls_name)
-        if os.path.isdir(cls_folder):
-            for image_name in os.listdir(cls_folder):
-                if image_name.endswith('.bmp'):
-                    image_paths.append(os.path.join(cls_folder, image_name))
-                    labels.append(class_to_idx[cls_name])
-    
-    preprocess = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    
-    images = []
-    valid_labels = []
-    valid_image_paths = []
-    for image_path, label in zip(image_paths, labels):
-        try:
-            image = Image.open(image_path).convert('RGB')
-            images.append(preprocess(image))
-            valid_labels.append(label)
-            valid_image_paths.append(image_path)
-        except (OSError, IOError) as e:
-            print(f"Skipping corrupted image: {image_path}, error: {e}")
-    
-    images = torch.stack(images)
-    labels = np.array(valid_labels)
-    return images, labels, class_names, valid_image_paths
+def load_images(zip_file):
+    print("Loading images from ZIP file...")
+
+    with zipfile.ZipFile(zip_file, 'r') as z:
+        # List of files in the ZIP archive
+        file_names = z.namelist()
+        
+        # Filter to only include image files and directories
+        image_files = [f for f in file_names if f.endswith('.bmp')]
+        class_dirs = set(os.path.dirname(f) for f in image_files)
+
+        # Extract class names from directories
+        class_names = sorted(class_dirs)
+        class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
+        
+        # Initialize lists for storing images, labels, and paths
+        images = []
+        labels = []
+        valid_image_paths = []
+
+        preprocess = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
+
+        for image_file in image_files:
+            try:
+                with z.open(image_file) as file:
+                    img = Image.open(file).convert('RGB')
+                    class_name = os.path.dirname(image_file)
+                    label = class_to_idx[class_name]
+                    images.append(preprocess(img))
+                    labels.append(label)
+                    valid_image_paths.append(image_file)
+            except (OSError, IOError) as e:
+                print(f"Skipping corrupted image: {image_file}, error: {e}")
+        
+        images = torch.stack(images)
+        labels = np.array(labels)
+        return images, labels, class_names, valid_image_paths
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
