@@ -173,7 +173,7 @@ def update_graph_and_labels(uploaded_file, selected_model, n_clicks, new_label, 
             model_path = LOCAL_PATHS[model_key]
             model = get_dino_bloom(model_path, load.model_options[model_key])
             
-            images = [transforms.ToTensor()(Image.open(io.BytesIO(base64.b64decode(img))).convert('RGB')) for img in uploaded_data_state['images']]
+            images = [transforms.ToTensor()(Image.open(io.BytesIO(base64.b64decode(img)))) for img in uploaded_data_state['images']]
             images = torch.stack(images)
             
             with torch.no_grad():
