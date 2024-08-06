@@ -18,6 +18,10 @@ import time
 import plotly.graph_objs as go
 import numpy as np
 from scipy.spatial import distance
+import plotly.graph_objs as go
+import numpy as np
+from scipy.spatial import distance
+from dash import dcc, html, Input, Output, State, no_update
 from dash import dcc, html
 
 print("Starting the application...")
@@ -61,7 +65,7 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
             opacity=0.8,
             line=dict(width=1, color='DarkSlateGrey')
         ),
-        text=["Unlabeled" if class_names[label] == "Unlabeled" else class_names[label] for label in labels],
+        text=[class_names[label] if label < len(class_names) else "Unlabeled" for label in labels],
         customdata=image_paths,
         hoverinfo="text",
         hovertemplate="%{text}<extra></extra>",
@@ -72,13 +76,13 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
         title="UMAP Projection with Images",
         xaxis=dict(
             title="UMAP 1",
-            showgrid=True,
-            gridcolor='lightgrey',
+            showgrid=False,
+            zeroline=False,
         ),
         yaxis=dict(
             title="UMAP 2",
-            showgrid=True,
-            gridcolor='lightgrey',
+            showgrid=False,
+            zeroline=False,
         ),
         hovermode='closest',
         dragmode='select',
@@ -88,13 +92,13 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
     fig = go.Figure(data=[trace], layout=layout)
 
     # Add legend entries
-    for label, color in color_map.items():
-        legend_name = "Unlabeled" if class_names[label] == "Unlabeled" else class_names[label]
+    for label in unique_labels:
+        legend_name = class_names[label] if label < len(class_names) else "Unlabeled"
         fig.add_trace(go.Scatter(
             x=[None],
             y=[None],
             mode='markers',
-            marker=dict(size=10, color=color),
+            marker=dict(size=10, color=color_map[label]),
             legendgroup=legend_name,
             showlegend=True,
             name=legend_name
@@ -106,6 +110,7 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
     fig.update_yaxes(autorange=True)
 
     return fig
+
 
 def get_sorted_cluster_images(umap_data, labels, image_paths, class_names):
     clusters = {}
@@ -128,6 +133,7 @@ def get_sorted_cluster_images(umap_data, labels, image_paths, class_names):
     
     return clusters
 
+# Update the layout to include a new dropdown for cluster removal
 app.layout = html.Div([
     html.H1("UMAP Visualization with DinoBloom Features"),
     html.Div([
@@ -153,6 +159,10 @@ app.layout = html.Div([
             html.Div([
                 dcc.Input(id='label-input', type='text', placeholder='Enter new label'),
                 html.Button('Apply Label', id='apply-label-button', n_clicks=0)
+            ]),
+            html.Div([
+                dcc.Dropdown(id='cluster-remove-dropdown', placeholder="Select cluster to remove"),
+                html.Button('Remove Cluster', id='remove-cluster-button', n_clicks=0)
             ]),
             html.Div(id='label-status'),
         ], style={'width': '58%', 'display': 'inline-block', 'vertical-align': 'top'}),
@@ -244,23 +254,26 @@ def get_model(model_key):
 @app.callback(
     [Output('umap-plot', 'figure'),
      Output('label-status', 'children'),
-     Output('cluster-images', 'children')],
+     Output('cluster-images', 'children'),
+     Output('cluster-remove-dropdown', 'options')],
     [Input('model-dropdown', 'value'),
      Input('is-data-loaded', 'data'),
-     Input('apply-label-button', 'n_clicks')],
+     Input('apply-label-button', 'n_clicks'),
+     Input('remove-cluster-button', 'n_clicks')],
     [State('label-input', 'value'),
-     State('umap-plot', 'selectedData')]
+     State('umap-plot', 'selectedData'),
+     State('cluster-remove-dropdown', 'value')]
 )
-def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_label, selected_data):
+def update_graph_and_apply_label(selected_model, is_data_loaded, apply_label_clicks, remove_cluster_clicks, new_label, selected_data, cluster_to_remove):
     ctx = dash.callback_context
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if not is_data_loaded:
-        return go.Figure(layout=go.Layout(title="Please upload data and select a model")), "No data loaded", []
+        return {}, "No data loaded", [], []
 
     if triggered_id == 'model-dropdown':
         if selected_model == 'select':
-            return go.Figure(layout=go.Layout(title="Please select a model")), "Please select a model", []
+            return {}, "Please select a model", [], []
         
         try:
             model = get_model(selected_model)
@@ -281,15 +294,18 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_l
             clusters = get_sorted_cluster_images(umap_data, global_data['labels'], global_data['image_paths'], global_data['class_names'])
             cluster_images = create_cluster_image_view(clusters)
             
-            return fig, "UMAP visualization created", cluster_images
+            # Update cluster removal dropdown options
+            cluster_options = [{'label': name, 'value': name} for name in global_data['class_names'] if name != "Unlabeled"]
+            
+            return fig, "UMAP visualization created", cluster_images, cluster_options
         except Exception as e:
             print(f"Error occurred: {str(e)}")
             print(traceback.format_exc())
-            return go.Figure(layout=go.Layout(title=f"Error: {str(e)}")), f"Error: {str(e)}", []
+            return {}, f"Error: {str(e)}", [], []
 
     elif triggered_id == 'apply-label-button':
-        if not n_clicks or not new_label or not selected_data:
-            return no_update, "No label applied", no_update
+        if not apply_label_clicks or not new_label or not selected_data:
+            return no_update, "No label applied", no_update, no_update
         
         selected_indices = [point['pointIndex'] for point in selected_data['points']]
         
@@ -304,9 +320,36 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_l
         clusters = get_sorted_cluster_images(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
         cluster_images = create_cluster_image_view(clusters)
         
-        return updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points.", cluster_images
+        # Update cluster removal dropdown options
+        cluster_options = [{'label': name, 'value': name} for name in global_data['class_names'] if name != "Unlabeled"]
+        
+        return updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points.", cluster_images, cluster_options
 
-    return go.Figure(layout=go.Layout(title="Ready")), "Ready", []
+    elif triggered_id == 'remove-cluster-button':
+        if not remove_cluster_clicks or not cluster_to_remove:
+            return no_update, "No cluster removed", no_update, no_update
+        
+        cluster_index = global_data['class_names'].index(cluster_to_remove)
+        global_data['labels'][global_data['labels'] == cluster_index] = 0  # Set to Unlabeled
+        global_data['class_names'].remove(cluster_to_remove)
+        
+        # Adjust labels after removal
+        for i in range(len(global_data['labels'])):
+            if global_data['labels'][i] > cluster_index:
+                global_data['labels'][i] -= 1
+        
+        updated_figure = create_umap_visualization(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
+        
+        # Get sorted cluster images
+        clusters = get_sorted_cluster_images(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
+        cluster_images = create_cluster_image_view(clusters)
+        
+        # Update cluster removal dropdown options
+        cluster_options = [{'label': name, 'value': name} for name in global_data['class_names'] if name != "Unlabeled"]
+        
+        return updated_figure, f"Removed cluster '{cluster_to_remove}'", cluster_images, cluster_options
+
+    return {}, "Ready", [], []
 
 def create_cluster_image_view(clusters):
     cluster_views = []
