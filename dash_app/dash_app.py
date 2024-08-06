@@ -6,42 +6,37 @@ import torch
 import numpy as np
 import umap
 import base64
-from io import BytesIO
-import zipfile
 import plotly.express as px
 import load
 from load import load_images, get_dino_bloom
 import traceback
 import io
 from pyngrok import ngrok
-import io
-import base64
-from PIL import Image
-import torch
-from torchvision import transforms
-import torch.nn as nn
-
+import zipfile
+from flask_caching import Cache
+import time
 
 print("Starting the application...")
 
 # Initialize Dash app
 app = dash.Dash(__name__)
 
-# Local model paths
-LOCAL_PATHS = {
-    "DinoBloom S": "/home/ubuntu/dino-vis/models/DinoBloom-S.pth",
-    "DinoBloom B": "/home/ubuntu/dino-vis/models/DinoBloom-B.pth",
-    "DinoBloom L": "/home/ubuntu/dino-vis/models/DinoBloom-L.pth",
-    "DinoBloom G": "/home/ubuntu/dino-vis/models/DinoBloom-G.pth"
-}
+# Setup cache
+cache = Cache(app.server, config={
+    'CACHE_TYPE': 'SimpleCache',
+    'CACHE_DEFAULT_TIMEOUT': 300
+})
 
+# Local model paths
+LOCAL_PATHS = load.LOCAL_PATHS
 model_options = load.model_options
 
-# Global variables to store UMAP data and labels
-umap_data = None
-global_labels = None
-global_class_names = None
-global_image_paths = None
+# Check if CUDA is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
+# Global variables
+global_data = {}
 
 def create_umap_visualization(umap_data, labels, image_paths, class_names):
     print(f"Creating UMAP visualization with {len(labels)} points")
@@ -91,7 +86,6 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
     return fig
 
 # App layout
-# App layout
 app.layout = html.Div([
     html.H1("UMAP Visualization with DinoBloom Features"),
     dcc.Upload(
@@ -100,13 +94,17 @@ app.layout = html.Div([
         multiple=False,
         max_size=-1
     ),
-    html.Div(id='upload-status'),  # New div for upload status
+    html.Div(id='upload-status'),
     dcc.Dropdown(
         id='model-dropdown',
         options=[{'label': k, 'value': k} for k in model_options.keys()],
         value='select'
     ),
-    dcc.Graph(id='umap-plot', clear_on_unhover=True),
+    dcc.Loading(
+        id="loading-1",
+        type="default",
+        children=[dcc.Graph(id='umap-plot', clear_on_unhover=True)]
+    ),
     dcc.Tooltip(id="graph-tooltip"),
     html.Div([
         dcc.Input(id='label-input', type='text', placeholder='Enter new label'),
@@ -115,16 +113,9 @@ app.layout = html.Div([
     html.Div(id='label-status'),
     dcc.Store(id='is-data-loaded', data=False),
     dcc.Store(id='uploaded-data', data=None),
-    dcc.Store(id='upload-status-store', data='')  # New store for upload status
+    dcc.Store(id='upload-status-store', data=''),
+    dcc.Interval(id='interval-component', interval=1000, n_intervals=0)
 ])
-
-
-def convert_tensor_to_base64_image(tensor_image):
-    # Convert tensor to PIL Image
-    pil_image = transforms.ToPILImage()(tensor_image)
-    buffered = io.BytesIO()
-    pil_image.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 # New client-side callback for upload status
 clientside_callback(
@@ -144,92 +135,86 @@ clientside_callback(
 @app.callback(
     [Output('uploaded-data', 'data'),
      Output('is-data-loaded', 'data'),
-     Output('umap-plot', 'figure'),
-     Output('label-status', 'children'),
      Output('upload-status', 'children')],
     [Input('upload-data', 'contents'),
-     Input('upload-data', 'filename'),
-     Input('model-dropdown', 'value'),
-     Input('apply-label-button', 'n_clicks'),
-     Input('upload-status-store', 'data')],
-    [State('label-input', 'value'),
-     State('umap-plot', 'selectedData'),
-     State('uploaded-data', 'data')]
+     Input('upload-data', 'filename')]
 )
-def update_graph_and_labels(contents, filename, selected_model, n_clicks, upload_status, new_label, selected_data, uploaded_data_state):
-    global umap_data, global_labels, global_class_names, global_image_paths
-
-    ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    if trigger_id == 'upload-status-store':
-        return no_update, no_update, no_update, no_update, upload_status
-
-    if trigger_id == 'upload-data':
-        if contents is None:
-            return no_update, False, no_update, "No data uploaded.", "Waiting for file..."
-        
-        try:
-            # Handle different content formats
-            if isinstance(contents, str):
-                # Content is a string, likely a data URL
-                if ',' in contents:
-                    content_type, content_string = contents.split(',')
-                    decoded = base64.b64decode(content_string)
-                else:
-                    # Content is just the base64 string
-                    decoded = base64.b64decode(contents)
-            elif isinstance(contents, bytes):
-                # Content is already in bytes
-                decoded = contents
+def process_upload(contents, filename):
+    if contents is None:
+        return no_update, False, "Waiting for file..."
+    
+    try:
+        # Handle different content formats
+        if isinstance(contents, str):
+            if ',' in contents:
+                content_type, content_string = contents.split(',')
+                decoded = base64.b64decode(content_string)
             else:
-                raise ValueError(f"Unsupported content format: {type(contents)}")
-            
-            # Debug information
-            print(f"Decoded data type: {type(decoded)}")
-            print(f"Decoded data length: {len(decoded)} bytes")
-            print(f"First 100 bytes of decoded data: {decoded[:100]}")
-            
-            if len(decoded) == 0:
-                raise ValueError("The uploaded file is empty.")
-            
-            zip_file = io.BytesIO(decoded)
-            
-            # Check if it's a valid ZIP file
-            if not zipfile.is_zipfile(zip_file):
-                raise zipfile.BadZipFile("The uploaded file is not a valid ZIP file.")
-            
-            images, labels, class_names, image_paths = load_images(zip_file)
-            print(f"Loaded {len(images)} images, {len(class_names)} classes")
-            
-            if len(images) == 0:
-                raise ValueError("No valid images found in the ZIP file.")
-            
-            # Convert images to base64 encoded strings
-            image_base64_list = [convert_tensor_to_base64_image(img) for img in images]
-            
-            return {
-                'images': image_base64_list,
-                'labels': labels.tolist(),
-                'class_names': class_names
-            }, True, no_update, f"Data uploaded successfully: {filename}", f"Uploaded {filename} successfully. {len(images)} images processed."
+                decoded = base64.b64decode(contents)
+        elif isinstance(contents, bytes):
+            decoded = contents
+        else:
+            raise ValueError(f"Unsupported content format: {type(contents)}")
+        
+        print(f"Decoded data type: {type(decoded)}")
+        print(f"Decoded data length: {len(decoded)} bytes")
+        
+        if len(decoded) == 0:
+            raise ValueError("The uploaded file is empty.")
+        
+        zip_file = io.BytesIO(decoded)
+        
+        if not zipfile.is_zipfile(zip_file):
+            raise zipfile.BadZipFile("The uploaded file is not a valid ZIP file.")
+        
+        images, labels, class_names, image_paths, valid_image_paths = load_images(zip_file)
+        print(f"Loaded {len(images)} images, {len(class_names)} classes")
+        
+        if len(images) == 0:
+            raise ValueError("No valid images found in the ZIP file.")
+        
+        global_data['images'] = images
+        global_data['labels'] = labels
+        global_data['class_names'] = class_names
+        global_data['image_paths'] = image_paths
+        global_data['valid_image_paths'] = valid_image_paths
+        
+        return {'status': 'success'}, True, f"Uploaded {filename} successfully. {len(images)} images processed."
 
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            print(traceback.format_exc())
-            return no_update, False, no_update, f"Error: {str(e)}", f"Upload failed: {str(e)}"
+    except Exception as e:
+        print(f"Error occurred: {str(e)}")
+        print(traceback.format_exc())
+        return no_update, False, f"Upload failed: {str(e)}"
 
-    if trigger_id == 'model-dropdown':
-        if not uploaded_data_state:
-            return no_update, no_update, no_update, "Please upload data first.", "No data uploaded"
+@cache.memoize()
+def get_model(model_key):
+    model_path = LOCAL_PATHS[model_key]
+    return get_dino_bloom(model_path, load.model_options[model_key])
+
+@app.callback(
+    [Output('umap-plot', 'figure'),
+     Output('label-status', 'children')],
+    [Input('model-dropdown', 'value'),
+     Input('is-data-loaded', 'data'),
+     Input('apply-label-button', 'n_clicks')],
+    [State('label-input', 'value'),
+     State('umap-plot', 'selectedData')]
+)
+def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_label, selected_data):
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if not is_data_loaded:
+        return go.Figure(), "No data loaded"
+
+    if triggered_id == 'model-dropdown':
+        if selected_model == 'select':
+            return go.Figure(), "Please select a model"
         
         try:
-            model_key = selected_model
-            model_path = LOCAL_PATHS[model_key]
-            model = get_dino_bloom(model_path, load.model_options[model_key])
+            model = get_model(selected_model)
             
-            images = [transforms.ToTensor()(Image.open(io.BytesIO(base64.b64decode(img)))) for img in uploaded_data_state['images']]
-            images = torch.stack(images)
+            images = global_data['images'].to(device)
             
             with torch.no_grad():
                 features = model(images).cpu().numpy()
@@ -237,33 +222,31 @@ def update_graph_and_labels(contents, filename, selected_model, n_clicks, upload
             reducer = umap.UMAP(n_neighbors=min(15, len(features) - 1), min_dist=0.1, metric='cosine')
             umap_data = reducer.fit_transform(features)
             
-            global_labels = np.zeros(len(uploaded_data_state['labels']), dtype=int)
-            global_class_names = uploaded_data_state['class_names']
-            global_image_paths = uploaded_data_state['images']
-
-            fig = create_umap_visualization(umap_data, global_labels, global_image_paths, global_class_names)
-            return uploaded_data_state, True, fig, "Data visualized.", "UMAP visualization created"
+            global_data['umap_data'] = umap_data
+            
+            fig = create_umap_visualization(umap_data, global_data['labels'], global_data['image_paths'], global_data['class_names'])
+            return fig, "UMAP visualization created"
         except Exception as e:
             print(f"Error occurred: {str(e)}")
             print(traceback.format_exc())
-            return uploaded_data_state, False, no_update, f"Error: {str(e)}", "Error in creating visualization"
+            return go.Figure(), f"Error: {str(e)}"
 
-    if trigger_id == 'apply-label-button':
-        if not selected_data or not new_label:
-            return no_update, no_update, no_update, "Please select points and enter a label.", "No label applied"
+    elif triggered_id == 'apply-label-button':
+        if not n_clicks or not new_label or not selected_data:
+            return no_update, "No label applied"
         
         selected_indices = [point['pointIndex'] for point in selected_data['points']]
         
-        if new_label not in global_class_names:
-            global_class_names.append(new_label)
-        new_label_index = global_class_names.index(new_label)
-        global_labels[selected_indices] = new_label_index
+        if new_label not in global_data['class_names']:
+            global_data['class_names'].append(new_label)
+        new_label_index = global_data['class_names'].index(new_label)
+        global_data['labels'][selected_indices] = new_label_index
 
-        updated_figure = create_umap_visualization(umap_data, global_labels, global_image_paths, global_class_names)
+        updated_figure = create_umap_visualization(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
         
-        return uploaded_data_state, True, updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points.", "Label applied successfully"
+        return updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points."
 
-    return no_update, no_update, no_update, "Ready.", "Waiting for user action"
+    return go.Figure(), "Ready"
 
 @app.callback(
     Output("graph-tooltip", "show"),
@@ -282,15 +265,8 @@ def display_hover(hoverData):
     image_path = pt["customdata"]
     class_name = pt["text"]
 
-    im = Image.open(io.BytesIO(base64.b64decode(image_path)))
-    im.thumbnail((200, 200))
-    buffer = BytesIO()
-    im.save(buffer, format="PNG")
-    encoded_image = base64.b64encode(buffer.getvalue()).decode()
-    im_url = "data:image/png;base64, " + encoded_image
-
     children = [
-        html.Img(src=im_url, style={"width": "200px"}),
+        html.Img(src=f"data:image/png;base64,{image_path}", style={"width": "200px"}),
         html.P(f"{class_name}", style={"color": "darkblue"})
     ]
 

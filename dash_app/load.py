@@ -6,6 +6,8 @@ import numpy as np
 import os
 import io
 import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+import base64
 
 LOCAL_PATHS = {
     "sample_data": "/home/ubuntu/data_sample_small.zip",
@@ -29,50 +31,73 @@ model_options = {
     "DinoBloom G": "dinov2_vitg14"
 }
 
-def load_images(zip_file):
-    print("Loading images from ZIP file...")
+class ZipDataset(Dataset):
+    def __init__(self, zip_file):
+        self.zip_file = zipfile.ZipFile(zip_file, 'r')
+        self.image_files = [f for f in self.zip_file.namelist() if f.endswith('.bmp')]
+        self.class_dirs = set(os.path.dirname(f) for f in self.image_files)
+        self.class_names = sorted(self.class_dirs)
+        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.class_names)}
 
-    with zipfile.ZipFile(zip_file, 'r') as z:
-        # List of files in the ZIP archive
-        file_names = z.namelist()
-        
-        # Filter to only include image files and directories
-        image_files = [f for f in file_names if f.endswith('.bmp')]
-        class_dirs = set(os.path.dirname(f) for f in image_files)
-
-        # Extract class names from directories
-        class_names = sorted(class_dirs)
-        class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_names)}
-        
-        # Initialize lists for storing images, labels, and paths
-        images = []
-        labels = []
-        valid_image_paths = []
-
-        preprocess = transforms.Compose([
+        self.preprocess = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
-        for image_file in image_files:
-            try:
-                with z.open(image_file) as file:
-                    img = Image.open(file).convert('RGB')
-                    class_name = os.path.dirname(image_file)
-                    label = class_to_idx[class_name]
-                    images.append(preprocess(img))
-                    labels.append(label)
-                    valid_image_paths.append(image_file)
-            except (OSError, IOError) as e:
-                print(f"Skipping corrupted image: {image_file}, error: {e}")
-        
-        images = torch.stack(images)
-        labels = np.array(labels)
-        return images, labels, class_names, valid_image_paths
+        self.preprocess_display = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+        ])
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        image_file = self.image_files[idx]
+        with self.zip_file.open(image_file) as file:
+            img = Image.open(file).convert('RGB')
+            class_name = os.path.dirname(image_file)
+            label = self.class_to_idx[class_name]
+
+            # Preprocess for model input
+            img_tensor = self.preprocess(img)
+
+            # Preprocess for display
+            img_display = self.preprocess_display(img)
+            img_bytes = io.BytesIO()
+            transforms.ToPILImage()(img_display).save(img_bytes, format='PNG')
+            img_base64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+
+        return img_tensor, label, img_base64, image_file
+
+def load_images(zip_file):
+    print("Loading images from ZIP file...")
+    dataset = ZipDataset(zip_file)
+    dataloader = DataLoader(dataset, batch_size=64, num_workers=4, pin_memory=True)
+
+    images = []
+    labels = []
+    image_paths = []
+    valid_image_paths = []
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    for batch in dataloader:
+        img_tensors, batch_labels, img_base64s, file_paths = batch
+        images.append(img_tensors.to(device))
+        labels.extend(batch_labels.numpy())
+        image_paths.extend(img_base64s)
+        valid_image_paths.extend(file_paths)
+
+    images = torch.cat(images)
+    labels = np.array(labels)
+    
+    return images, labels, dataset.class_names, image_paths, valid_image_paths
 
 def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
-    pretrained = torch.load(modelpath, map_location=torch.device('cpu'))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pretrained = torch.load(modelpath, map_location=device)
     model = torch.hub.load('facebookresearch/dinov2', modelname)
     
     new_state_dict = {}
@@ -87,4 +112,5 @@ def get_dino_bloom(modelpath, modelname="dinov2_vitb14"):
     model.pos_embed = pos_embed
 
     model.load_state_dict(new_state_dict, strict=True)
+    model = model.to(device)
     return model
