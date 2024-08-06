@@ -46,6 +46,7 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
     
     point_colors = [color_map[label] for label in labels]
 
+    # Create main scatter plot
     trace = go.Scatter(
         x=umap_data[:, 0],
         y=umap_data[:, 1],
@@ -56,10 +57,11 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
             opacity=0.8,
             line=dict(width=1, color='DarkSlateGrey')
         ),
-        text=[class_names[label] if label < len(class_names) else f"Unknown Label {label}" for label in labels],
+        text=["Unlabeled" if class_names[label] == "Unlabeled" else class_names[label] for label in labels],
         customdata=image_paths,
         hoverinfo="text",
         hovertemplate="%{text}<extra></extra>",
+        showlegend=False  # Hide this trace from the legend
     )
 
     layout = go.Layout(
@@ -72,15 +74,17 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
 
     fig = go.Figure(data=[trace], layout=layout)
 
+    # Add legend entries
     for label, color in color_map.items():
+        legend_name = "Unlabeled" if class_names[label] == "Unlabeled" else class_names[label]
         fig.add_trace(go.Scatter(
             x=[None],
             y=[None],
             mode='markers',
             marker=dict(size=10, color=color),
-            legendgroup=class_names[label] if label < len(class_names) else f"Unknown Label {label}",
+            legendgroup=legend_name,
             showlegend=True,
-            name=class_names[label] if label < len(class_names) else f"Unknown Label {label}"
+            name=legend_name
         ))
 
     return fig
@@ -174,8 +178,8 @@ def process_upload(contents, filename):
             raise ValueError("No valid images found in the ZIP file.")
         
         global_data['images'] = images
-        global_data['labels'] = labels
-        global_data['class_names'] = class_names
+        global_data['labels'] = np.zeros(len(labels), dtype=int)  # All labels set to 0
+        global_data['class_names'] = ["Unlabeled"] + [name for name in class_names if name != "Unlabeled"]
         global_data['image_paths'] = image_paths
         global_data['valid_image_paths'] = valid_image_paths
         
