@@ -15,6 +15,10 @@ from pyngrok import ngrok
 import zipfile
 from flask_caching import Cache
 import time
+import plotly.graph_objs as go
+import numpy as np
+from scipy.spatial import distance
+from dash import dcc, html
 
 print("Starting the application...")
 
@@ -66,10 +70,19 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
 
     layout = go.Layout(
         title="UMAP Projection with Images",
-        xaxis=dict(title="UMAP 1"),
-        yaxis=dict(title="UMAP 2"),
+        xaxis=dict(
+            title="UMAP 1",
+            showgrid=True,
+            gridcolor='lightgrey',
+        ),
+        yaxis=dict(
+            title="UMAP 2",
+            showgrid=True,
+            gridcolor='lightgrey',
+        ),
         hovermode='closest',
-        dragmode='select'
+        dragmode='select',
+        plot_bgcolor='rgba(0,0,0,0)',  # Transparent background
     )
 
     fig = go.Figure(data=[trace], layout=layout)
@@ -87,34 +100,67 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
             name=legend_name
         ))
 
+    # Autoscale the axes
+    fig.update_layout(autosize=True)
+    fig.update_xaxes(autorange=True)
+    fig.update_yaxes(autorange=True)
+
     return fig
 
-# App layout
+def get_sorted_cluster_images(umap_data, labels, image_paths, class_names):
+    clusters = {}
+    for label in np.unique(labels):
+        if class_names[label] != "Unlabeled":
+            cluster_points = umap_data[labels == label]
+            cluster_images = np.array(image_paths)[labels == label]
+            
+            # Calculate centroid
+            centroid = np.mean(cluster_points, axis=0)
+            
+            # Calculate distances to centroid
+            distances = [distance.euclidean(point, centroid) for point in cluster_points]
+            
+            # Sort images by distance
+            sorted_indices = np.argsort(distances)
+            sorted_images = cluster_images[sorted_indices]
+            
+            clusters[class_names[label]] = sorted_images.tolist()
+    
+    return clusters
+
 app.layout = html.Div([
     html.H1("UMAP Visualization with DinoBloom Features"),
-    dcc.Upload(
-        id='upload-data',
-        children=html.Button('Upload Data (Zip)'),
-        multiple=False,
-        max_size=-1
-    ),
-    html.Div(id='upload-status'),
-    dcc.Dropdown(
-        id='model-dropdown',
-        options=[{'label': k, 'value': k} for k in model_options.keys()],
-        value='select'
-    ),
-    dcc.Loading(
-        id="loading-1",
-        type="default",
-        children=[dcc.Graph(id='umap-plot', clear_on_unhover=True)]
-    ),
-    dcc.Tooltip(id="graph-tooltip"),
     html.Div([
-        dcc.Input(id='label-input', type='text', placeholder='Enter new label'),
-        html.Button('Apply Label', id='apply-label-button', n_clicks=0)
+        html.Div([
+            dcc.Upload(
+                id='upload-data',
+                children=html.Button('Upload Data (Zip)'),
+                multiple=False,
+                max_size=-1
+            ),
+            html.Div(id='upload-status'),
+            dcc.Dropdown(
+                id='model-dropdown',
+                options=[{'label': k, 'value': k} for k in model_options.keys()],
+                value='select'
+            ),
+            dcc.Loading(
+                id="loading-1",
+                type="default",
+                children=[dcc.Graph(id='umap-plot', clear_on_unhover=True)]
+            ),
+            dcc.Tooltip(id="graph-tooltip"),
+            html.Div([
+                dcc.Input(id='label-input', type='text', placeholder='Enter new label'),
+                html.Button('Apply Label', id='apply-label-button', n_clicks=0)
+            ]),
+            html.Div(id='label-status'),
+        ], style={'width': '58%', 'display': 'inline-block', 'vertical-align': 'top'}),
+        html.Div([
+            html.H3("Cluster Images"),
+            html.Div(id='cluster-images')
+        ], style={'width': '38%', 'display': 'inline-block', 'vertical-align': 'top', 'margin-left': '2%'})
     ]),
-    html.Div(id='label-status'),
     dcc.Store(id='is-data-loaded', data=False),
     dcc.Store(id='uploaded-data', data=None),
     dcc.Store(id='upload-status-store', data=''),
@@ -197,7 +243,8 @@ def get_model(model_key):
 
 @app.callback(
     [Output('umap-plot', 'figure'),
-     Output('label-status', 'children')],
+     Output('label-status', 'children'),
+     Output('cluster-images', 'children')],
     [Input('model-dropdown', 'value'),
      Input('is-data-loaded', 'data'),
      Input('apply-label-button', 'n_clicks')],
@@ -209,11 +256,11 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_l
     triggered_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
     if not is_data_loaded:
-        return go.Figure(), "No data loaded"
+        return go.Figure(layout=go.Layout(title="Please upload data and select a model")), "No data loaded", []
 
     if triggered_id == 'model-dropdown':
         if selected_model == 'select':
-            return go.Figure(), "Please select a model"
+            return go.Figure(layout=go.Layout(title="Please select a model")), "Please select a model", []
         
         try:
             model = get_model(selected_model)
@@ -229,15 +276,20 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_l
             global_data['umap_data'] = umap_data
             
             fig = create_umap_visualization(umap_data, global_data['labels'], global_data['image_paths'], global_data['class_names'])
-            return fig, "UMAP visualization created"
+            
+            # Get sorted cluster images
+            clusters = get_sorted_cluster_images(umap_data, global_data['labels'], global_data['image_paths'], global_data['class_names'])
+            cluster_images = create_cluster_image_view(clusters)
+            
+            return fig, "UMAP visualization created", cluster_images
         except Exception as e:
             print(f"Error occurred: {str(e)}")
             print(traceback.format_exc())
-            return go.Figure(), f"Error: {str(e)}"
+            return go.Figure(layout=go.Layout(title=f"Error: {str(e)}")), f"Error: {str(e)}", []
 
     elif triggered_id == 'apply-label-button':
         if not n_clicks or not new_label or not selected_data:
-            return no_update, "No label applied"
+            return no_update, "No label applied", no_update
         
         selected_indices = [point['pointIndex'] for point in selected_data['points']]
         
@@ -248,9 +300,25 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, n_clicks, new_l
 
         updated_figure = create_umap_visualization(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
         
-        return updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points."
+        # Get sorted cluster images
+        clusters = get_sorted_cluster_images(global_data['umap_data'], global_data['labels'], global_data['image_paths'], global_data['class_names'])
+        cluster_images = create_cluster_image_view(clusters)
+        
+        return updated_figure, f"Applied label '{new_label}' to {len(selected_indices)} points.", cluster_images
 
-    return go.Figure(), "Ready"
+    return go.Figure(layout=go.Layout(title="Ready")), "Ready", []
+
+def create_cluster_image_view(clusters):
+    cluster_views = []
+    for cluster_name, images in clusters.items():
+        cluster_views.append(html.Div([
+            html.H4(cluster_name),
+            html.Div([
+                html.Img(src=f"data:image/png;base64,{img}", style={'width': '50px', 'height': '50px', 'margin': '2px'})
+                for img in images[:10]  # Display first 10 images
+            ], style={'display': 'flex', 'overflow-x': 'auto'})
+        ]))
+    return cluster_views
 
 @app.callback(
     Output("graph-tooltip", "show"),
