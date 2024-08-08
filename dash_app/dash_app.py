@@ -355,13 +355,17 @@ def update_graph_and_apply_label(selected_model, is_data_loaded, apply_label_cli
 def create_cluster_image_view(clusters):
     cluster_views = []
     for cluster_name, images in clusters.items():
-        cluster_views.append(html.Div([
+        cluster_div = html.Div([
             html.H4(cluster_name),
-            html.Div([
-                html.Img(src=f"data:image/png;base64,{img}", style={'width': '50px', 'height': '50px', 'margin': '2px'})
-                for img in images[:10]  # Display first 10 images
-            ], style={'display': 'flex', 'overflow-x': 'auto'})
-        ]))
+            html.Div(
+                [
+                    html.Img(src=f"data:image/png;base64,{img}", style={'width': '50px', 'height': '50px', 'margin': '2px'})
+                    for img in images
+                ],
+                style={'display': 'flex', 'overflow-x': 'auto', 'max-width': '100%'}
+            )
+        ])
+        cluster_views.append(cluster_div)
     return cluster_views
 
 @app.callback(
