@@ -94,6 +94,7 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
     # Add legend entries
     for label in unique_labels:
         legend_name = class_names[label] if label < len(class_names) else "Unlabeled"
+        num_images = np.sum(labels == label)
         fig.add_trace(go.Scatter(
             x=[None],
             y=[None],
@@ -101,7 +102,7 @@ def create_umap_visualization(umap_data, labels, image_paths, class_names):
             marker=dict(size=10, color=color_map[label]),
             legendgroup=legend_name,
             showlegend=True,
-            name=legend_name
+            name=f"{legend_name} ({num_images})"
         ))
 
     # Autoscale the axes
